@@ -65,7 +65,7 @@ probe() {
 
 healthy() {
     for _ in $(seq 1 30); do
-        if probe "api.${site_domain}" /healthz && probe "$site_domain" /; then
+        if probe "api.${site_domain}" /healthz && probe "mcp.${site_domain}" /healthz && probe "$site_domain" /; then
             return 0
         fi
         sleep 2
@@ -76,7 +76,7 @@ healthy() {
 # Just remove the current image and ran the one beforehand instead
 rollback() {
     echo "!! Release ${new_tag} failed"
-    "${compose[@]}" logs --tail 80 migrate api frontend rag || true
+    "${compose[@]}" logs --tail 80 migrate api frontend rag mcp || true
 
     if [[ -z "$previous_tag" || "$previous_tag" == "$new_tag" ]]; then
         echo "!! No previous release to roll back to"

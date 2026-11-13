@@ -1,6 +1,6 @@
 name: Deploy
 
-# Every push to main: run the CI suite, build the three images, push them to GHCR, then
+# Every push to main: run the CI suite, build the four images, push them to GHCR, then
 # SSH into the VPS and roll the stack forward. Run it by hand with an image tag to roll
 # back (or forward) to any release that is already in the registry, without rebuilding.
 #
@@ -62,6 +62,8 @@ jobs:
             context: frontend
           - image: portfolio-rag
             context: rag
+          - image: portfolio-mcp
+            context: mcp-server
 
     steps:
       - uses: actions/checkout@v4

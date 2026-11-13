@@ -437,9 +437,11 @@ rag/             Python worker
   src/rag/       corpus, chunking, embeddings, indexing, retrieval, citations, scoring, pipeline
   eval/          fixture portfolio, golden set, metrics, judge, reports
   tests/         unit + integration
+mcp-server/      Remote MCP server: lets an AI assistant write drafts (OAuth, never deletes)
 deploy/          Ansible, deploy/backup scripts, production runbook
 ```
 
 Deeper dives: [`rag/README.md`](rag/README.md) for the retrieval service,
-[`rag/src/rag/providers/README.md`](rag/src/rag/providers/README.md) for adding an LLM vendor, and
+[`rag/src/rag/providers/README.md`](rag/src/rag/providers/README.md) for adding an LLM vendor,
+[`mcp-server/README.md`](mcp-server/README.md) for the AI-assistant connector and its OAuth flow, and
 [`deploy/README.md`](deploy/README.md) for operations.
