@@ -53,7 +53,7 @@ export function TokenRow({ token, busy, onRotate, onRevoke, onForget }: TokenRow
           </span>
 
           <Badge tone={token.scope === "Write" ? "accent" : "outline"}>
-            {token.scope === "Write" ? "read + write" : "read only"}
+            {token.scope === "Write" ? "read + write" : token.scope === "Author" ? "drafts only" : "read only"}
           </Badge>
 
           {status !== "active" ? (
