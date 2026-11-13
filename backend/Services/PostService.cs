@@ -118,6 +118,7 @@ public class PostService : IPostService
             ?? throw NotFoundException.For("Post", id);
 
         EnsureOwnedByCaller(post);
+        EnsureWritableByCaller(post);
 
         if (!string.IsNullOrWhiteSpace(dto.Slug))
             post.Slug = await ResolveSlugAsync(dto.Slug, dto.Title, excludingPostId: id, cancellationToken);
@@ -125,7 +126,10 @@ public class PostService : IPostService
         post.Title = dto.Title.Trim();
         post.Summary = string.IsNullOrWhiteSpace(dto.Summary) ? null : dto.Summary.Trim();
         post.Body = dto.Body;
-        post.IsFeatured = dto.IsFeatured;
+        // NOTE: which project is the showcase is the author's call. An assistant's edit keeps
+        // whatever the studio last set rather than resetting it with a default false.
+        if (!IsAuthorScoped)
+            post.IsFeatured = dto.IsFeatured;
         post.RepoUrl = Clean(dto.RepoUrl);
         post.DemoUrl = Clean(dto.DemoUrl);
         post.UpdatedAt = _timeProvider.GetUtcNow();
@@ -275,6 +279,22 @@ public class PostService : IPostService
     {
         if (post.AuthorId != _currentUser.RequireAuthorId())
             throw ForbiddenException.For("post", post.Id);
+    }
+
+    private bool IsAuthorScoped => _currentUser.ApiTokenScope == ApiTokenScope.Author;
+
+    /// <summary>
+    /// An assistant may only rewrite drafts. A live post is already in the job-fit index,
+    /// and changing what a recruiter can cite is something the author does from the studio.
+    /// </summary>
+    private void EnsureWritableByCaller(Post post)
+    {
+        if (IsAuthorScoped && !post.IsDraft)
+        {
+            throw new ForbiddenException(
+                "This token can only edit drafts, and this post is published. Unpublish it from " +
+                "the studio first if it should change.");
+        }
     }
 
     private async Task<string> ResolveSlugAsync(

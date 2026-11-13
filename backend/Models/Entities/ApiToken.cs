@@ -8,7 +8,16 @@ namespace Backend.Models.Entities;
 public enum ApiTokenScope
 {
     Read = 0,
-    Write = 1
+    Write = 1,
+
+    /// <summary>
+    /// What an AI assistant gets: read everything, and write drafts. It can create a post,
+    /// edit and illustrate it while it is still a draft, and publish it — and nothing else.
+    /// No DELETE on any route, no unpublishing, no editing a post that is already live, no
+    /// replacing artwork (which deletes the old file). Only endpoints marked
+    /// <c>[AllowAuthorScope]</c> accept it for anything but a read.
+    /// </summary>
+    Author = 2
 }
 
 /// <summary>
@@ -53,6 +62,14 @@ public class ApiToken
     public DateTimeOffset? LastUsedAt { get; set; }
 
     public DateTimeOffset? RevokedAt { get; set; }
+
+    /// <summary>
+    /// Set when the token was minted by the OAuth flow rather than issued by hand in the
+    /// studio. Such a token is short-lived, belongs to that grant, and dies with it.
+    /// </summary>
+    public int? OAuthGrantId { get; set; }
+
+    public OAuthGrant? OAuthGrant { get; set; }
 
     public bool IsActive(DateTimeOffset now) =>
         RevokedAt is null && (ExpiresAt is null || ExpiresAt > now);

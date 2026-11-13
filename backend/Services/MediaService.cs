@@ -50,19 +50,37 @@ public class MediaService : IMediaService
         _logger = logger;
     }
 
-    public async Task<MediaDto> AddToPostAsync(
+    public Task<MediaDto> AddToPostAsync(
         int postId,
         IFormFile file,
         MediaRole role = MediaRole.Attachment,
+        CancellationToken cancellationToken = default) =>
+        AttachAsync(
+            _currentUser.RequireAuthorId(),
+            postId,
+            file,
+            role,
+            caption: null,
+            authorScoped: _currentUser.ApiTokenScope == ApiTokenScope.Author,
+            cancellationToken);
+
+    public async Task<MediaDto> AttachAsync(
+        int authorId,
+        int postId,
+        IFormFile file,
+        MediaRole role,
+        string? caption,
+        bool authorScoped,
         CancellationToken cancellationToken = default)
     {
-        var authorId = _currentUser.RequireAuthorId();
-
         var post = await _posts.GetByIdAsync(postId, tracked: false, cancellationToken)
             ?? throw NotFoundException.For("Post", postId);
 
         if (post.AuthorId != authorId)
             throw ForbiddenException.For("post", postId);
+
+        if (authorScoped)
+            await EnsureAuthorScopeMayAttachAsync(post, role, cancellationToken);
 
         // NOTE: a thumbnail is drawn as a still in a card and nothing ever plays it, so a
         // video in that slot would render as a dead frame. A trailer takes either — a
@@ -91,6 +109,7 @@ public class MediaService : IMediaService
             ByteSize = stored.ByteSize,
             Extension = upload.Extension,
             Role = role,
+            Caption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim(),
             PostId = postId,
             CreatedAt = _timeProvider.GetUtcNow()
         };
@@ -179,6 +198,12 @@ public class MediaService : IMediaService
     {
         var media = await LoadOwnedAsync(postId, mediaId, cancellationToken);
 
+        if (_currentUser.ApiTokenScope == ApiTokenScope.Author && !media.Post.IsDraft)
+        {
+            throw new ForbiddenException(
+                "This token can only change media on a draft, and this post is published.");
+        }
+
         media.Caption = string.IsNullOrWhiteSpace(dto.Caption) ? null : dto.Caption.Trim();
 
         await _medias.SaveChangesAsync(cancellationToken);
@@ -205,6 +230,34 @@ public class MediaService : IMediaService
 
         _medias.Remove(media);
         await _medias.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// What an assistant may attach: anything to a draft, but never over an existing
+    /// thumbnail or trailer — attaching one replaces the old file, and replacing deletes it.
+    /// </summary>
+    private async Task EnsureAuthorScopeMayAttachAsync(
+        Post post,
+        MediaRole role,
+        CancellationToken cancellationToken)
+    {
+        if (!post.IsDraft)
+        {
+            throw new ForbiddenException(
+                "This token can only add media to a draft, and this post is published.");
+        }
+
+        if (role == MediaRole.Attachment)
+            return;
+
+        var existing = await _medias.GetByPostIdAsync(post.Id, cancellationToken);
+
+        if (existing.Any(item => item.Role == role))
+        {
+            throw new ConflictException(
+                $"This post already has a {role.ToString().ToLowerInvariant()}, and this token cannot " +
+                "replace it because that would delete the old file. Remove it from the studio first.");
+        }
     }
 
     /// <summary>

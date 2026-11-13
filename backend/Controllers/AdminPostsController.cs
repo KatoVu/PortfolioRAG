@@ -1,3 +1,4 @@
+using Backend.Common.Security;
 using Backend.Models.DTOs;
 using Backend.Models.Requests;
 using Backend.Services;
@@ -43,6 +44,7 @@ public class AdminPostsController : ControllerBase
         Ok(await _postService.GetByIdAsync(id, cancellationToken));
 
     /// <summary>Creates a draft owned by you. The author comes from your access token.</summary>
+    [AllowAuthorScope]
     [HttpPost]
     [ProducesResponseType(typeof(PostDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -58,6 +60,7 @@ public class AdminPostsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = post.Id }, post);
     }
 
+    [AllowAuthorScope]
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(PostDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -71,6 +74,7 @@ public class AdminPostsController : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await _postService.UpdateAsync(id, dto, cancellationToken));
 
+    [AllowAuthorScope]
     [HttpPost("{id:int}/publish")]
     [ProducesResponseType(typeof(PostDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

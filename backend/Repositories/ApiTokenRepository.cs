@@ -18,7 +18,9 @@ public class ApiTokenRepository : IApiTokenRepository
         CancellationToken cancellationToken = default) =>
         await _context.ApiTokens
             .AsNoTracking()
-            .Where(t => t.AuthorId == authorId)
+            // NOTE: the hourly tokens an OAuth grant mints are not the author's to manage one
+            // by one. The studio lists the grant instead — see IOAuthRepository.
+            .Where(t => t.AuthorId == authorId && t.OAuthGrantId == null)
             .OrderByDescending(t => t.CreatedAt)
             .ThenByDescending(t => t.Id)
             .ToListAsync(cancellationToken);
@@ -30,7 +32,9 @@ public class ApiTokenRepository : IApiTokenRepository
         CancellationToken cancellationToken = default)
     {
         var query = tracked ? _context.ApiTokens : _context.ApiTokens.AsNoTracking();
-        return query.FirstOrDefaultAsync(t => t.Id == id && t.AuthorId == authorId, cancellationToken);
+        return query.FirstOrDefaultAsync(
+            t => t.Id == id && t.AuthorId == authorId && t.OAuthGrantId == null,
+            cancellationToken);
     }
 
     // Include the author in 1 round trip to authenticate
@@ -53,6 +57,7 @@ public class ApiTokenRepository : IApiTokenRepository
         CancellationToken cancellationToken = default) =>
         _context.ApiTokens.AnyAsync(
             t => t.AuthorId == authorId &&
+                 t.OAuthGrantId == null &&
                  t.RevokedAt == null &&
                  t.Name.ToLower() == name.ToLower() &&
                  (excludingTokenId == null || t.Id != excludingTokenId),
