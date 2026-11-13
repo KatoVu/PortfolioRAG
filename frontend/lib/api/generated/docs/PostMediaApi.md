@@ -4,11 +4,88 @@ All URIs are relative to *http://localhost:5019*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**postMediaCreateUploadTicket**](PostMediaApi.md#postmediacreateuploadticket) | **POST** /api/admin/posts/{postId}/media/upload-tickets |  |
 | [**postMediaDelete**](PostMediaApi.md#postmediadelete) | **DELETE** /api/admin/posts/{postId}/media/{mediaId} |  |
 | [**postMediaGetAll**](PostMediaApi.md#postmediagetall) | **GET** /api/admin/posts/{postId}/media |  |
 | [**postMediaUpdate**](PostMediaApi.md#postmediaupdate) | **PUT** /api/admin/posts/{postId}/media/{mediaId} |  |
 | [**postMediaUpload**](PostMediaApi.md#postmediaupload) | **POST** /api/admin/posts/{postId}/media |  |
 
+
+
+## postMediaCreateUploadTicket
+
+> UploadTicketDto postMediaCreateUploadTicket(postId, createUploadTicketDto)
+
+
+
+### Example
+
+```ts
+import {
+  Configuration,
+  PostMediaApi,
+} from '';
+import type { PostMediaCreateUploadTicketRequest } from '';
+
+async function example() {
+  console.log("🚀 Testing  SDK...");
+  const config = new Configuration({ 
+    // Configure HTTP bearer authorization: Bearer
+    accessToken: "YOUR BEARER TOKEN",
+  });
+  const api = new PostMediaApi(config);
+
+  const body = {
+    // number
+    postId: 56,
+    // CreateUploadTicketDto
+    createUploadTicketDto: ...,
+  } satisfies PostMediaCreateUploadTicketRequest;
+
+  try {
+    const data = await api.postMediaCreateUploadTicket(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **postId** | `number` |  | [Defaults to `undefined`] |
+| **createUploadTicketDto** | [CreateUploadTicketDto](CreateUploadTicketDto.md) |  | |
+
+### Return type
+
+[**UploadTicketDto**](UploadTicketDto.md)
+
+### Authorization
+
+[Bearer](../README.md#Bearer)
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+| **401** |  |  -  |
+| **403** |  |  -  |
+| **404** |  |  -  |
+| **503** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## postMediaDelete

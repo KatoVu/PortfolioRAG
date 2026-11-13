@@ -21,6 +21,7 @@
 export const ApiTokenScope = {
     Read: 'Read',
     Write: 'Write',
+    Author: 'Author',
 } as const;
 export type ApiTokenScope = typeof ApiTokenScope[keyof typeof ApiTokenScope];
 
