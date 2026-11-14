@@ -194,7 +194,7 @@ switch (storageOptions.Provider)
 
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = mediaOptions.MaxUploadBytes + RequestOverheadBytes;
+    options.MultipartBodyLengthLimit = mediaOptions.MaxUploadRequestBytes;
 });
 
 var llmOptions = builder.Configuration
@@ -514,9 +514,4 @@ app.Run();
 // NOTE: exposed so the integration tests can spin the real pipeline up with WebApplicationFactory.
 public partial class Program
 {
-    /// <summary>
-    /// Slack over the configured file size for the multipart envelope itself — boundaries,
-    /// headers and the other fields of the form.
-    /// </summary>
-    private const long RequestOverheadBytes = 1024 * 1024;
 }

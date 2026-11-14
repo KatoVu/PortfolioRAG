@@ -1,3 +1,4 @@
+using Backend.Common;
 using Backend.Common.Security;
 using Backend.Models.DTOs;
 using Backend.Models.DTOs.OAuth;
@@ -52,8 +53,7 @@ public class PostMediaController : ControllerBase
     [AllowAuthorScope]
     [HttpPost]
     [Consumes("multipart/form-data")]
-    // NOTE: disable body limit as new limiter is bounded by FormOptions.MultipartBodyLengthLimit
-    [DisableRequestSizeLimit]
+    [UploadSizeLimit]
     [ProducesResponseType(typeof(MediaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

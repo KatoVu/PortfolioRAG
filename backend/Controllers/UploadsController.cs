@@ -1,3 +1,4 @@
+using Backend.Common;
 using Backend.Models.DTOs;
 using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -24,8 +25,7 @@ public class UploadsController : ControllerBase
     /// <summary>Uploads the file a link was issued for, as multipart field <c>file</c>.</summary>
     [HttpPost("{ticket}")]
     [Consumes("multipart/form-data")]
-    // NOTE: as on the regular upload, the limit that applies is FormOptions.MultipartBodyLengthLimit.
-    [DisableRequestSizeLimit]
+    [UploadSizeLimit]
     [ProducesResponseType(typeof(MediaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
