@@ -141,6 +141,7 @@ public class OAuthTests
         var query = QueryHelpers.ParseQuery(new Uri(result.RedirectUrl).Query);
 
         Assert.Equal("access_denied", query["error"]);
+        Assert.Equal("https://api.example.com", query["iss"]);
         Assert.False(query.ContainsKey("code"));
         Assert.Equal(0, await harness.Context.OAuthAuthorizationCodes.CountAsync());
     }

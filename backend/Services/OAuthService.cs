@@ -753,13 +753,15 @@ public partial class OAuthService : IOAuthService
         uri.IsLoopback ||
         (IPAddress.TryParse(uri.Host.Trim('[', ']'), out var address) && IPAddress.IsLoopback(address));
 
-    private static string ErrorRedirect(string redirectUri, string error, string description, string? state)
+    private string ErrorRedirect(string redirectUri, string error, string description, string? state)
     {
         var query = new Dictionary<string, string?>
         {
             ["error"] = error,
             ["error_description"] = description,
-            ["state"] = state
+            ["state"] = state,
+            // RFC 9207: error responses carry the issuer too, or a mix-up attacker can forge them.
+            ["iss"] = _options.IssuerBase
         };
 
         return QueryHelpers.AddQueryString(redirectUri, query.Where(pair => pair.Value is not null)!);
