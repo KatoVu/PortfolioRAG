@@ -127,3 +127,12 @@ async def test_media_comes_with_the_embed_the_studio_would_insert(
 async def test_an_api_refusal_reaches_the_model_in_its_own_words(server, signed_in):
     with pytest.raises(ToolError, match="was not found"):
         await call(server, "get_post", post_id=404)
+
+
+async def test_every_tool_publishes_the_shape_of_its_answer(server):
+    tools = {tool.name: tool for tool in await server.list_tools()}
+
+    assert all(tool.output_schema for tool in tools.values())
+    post = tools["get_post"].output_schema["properties"]
+    assert post["status"]["enum"] == ["draft", "published"]
+    assert "media" in post

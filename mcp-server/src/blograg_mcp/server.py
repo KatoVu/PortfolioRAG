@@ -26,6 +26,16 @@ from starlette.responses import JSONResponse
 from .api import ApiError, BlogRagApi
 from .auth import SCOPE, ApiTokenVerifier
 from .config import Settings
+from .models import (
+    Account,
+    Media,
+    MediaList,
+    Post,
+    PostPage,
+    PostWithMedia,
+    Readiness,
+    UploadTicket,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,50 +113,41 @@ def build_server(
     # -- reading ------------------------------------------------------------------------
 
     @server.tool(annotations=READ)
-    async def whoami() -> dict[str, Any]:
+    async def whoami() -> Account:
         """The BlogRAG account this connection writes to: name, handle, and portfolio URL path."""
-        me = await call(lambda c: c.me())
-        return {
-            "id": me.get("id"),
-            "name": me.get("name"),
-            "handle": me.get("handle"),
-            "email_confirmed": me.get("isEmailConfirmed"),
-        }
+        return Account.from_api(await call(lambda c: c.me()))
 
     @server.tool(annotations=READ)
     async def list_posts(
         status: Literal["all", "drafts", "published"] = "all",
         search: Annotated[str | None, Field(description="Matches titles and summaries.")] = None,
         page: Annotated[int, Field(ge=1)] = 1,
-    ) -> dict[str, Any]:
+    ) -> PostPage:
         """The user's posts, newest first, 20 a page. Use it to check whether a topic is already
         covered before drafting, and to learn the user's voice from what they have published."""
         is_draft = {"all": None, "drafts": True, "published": False}[status]
         result = await call(
             lambda c: c.list_posts(is_draft=is_draft, search=search, page=page, page_size=20)
         )
-        return {
-            "page": result.get("page"),
-            "total_pages": result.get("totalPages"),
-            "total": result.get("totalItems"),
-            "posts": [_summary(item) for item in result.get("items", [])],
-        }
+        return PostPage.from_api(result)
 
     @server.tool(annotations=READ)
-    async def get_post(post_id: PostId) -> dict[str, Any]:
+    async def get_post(post_id: PostId) -> PostWithMedia:
         """One post in full: its Markdown body, links, status, and every attached file."""
         post = await call(lambda c: c.get_post(post_id))
         media = await call(lambda c: c.list_media(post_id))
-        return {**_post(post), "media": [_media(item) for item in media]}
+        return PostWithMedia(
+            **Post.from_api(post).model_dump(), media=[Media.from_api(item) for item in media]
+        )
 
     @server.tool(annotations=READ)
-    async def list_media(post_id: PostId) -> dict[str, Any]:
+    async def list_media(post_id: PostId) -> MediaList:
         """Files attached to a post, each with the Markdown that embeds it in the body."""
         media = await call(lambda c: c.list_media(post_id))
-        return {"post_id": post_id, "media": [_media(item) for item in media]}
+        return MediaList(post_id=post_id, media=[Media.from_api(item) for item in media])
 
     @server.tool(annotations=READ)
-    async def check_publish_readiness(post_id: PostId) -> dict[str, Any]:
+    async def check_publish_readiness(post_id: PostId) -> Readiness:
         """Whether a draft can be published, and what is missing if not. A post needs a
         thumbnail and a trailer before the API will publish it."""
         post = await call(lambda c: c.get_post(post_id))
@@ -162,12 +163,12 @@ def build_server(
             missing.append("summary (recommended, shown on the project card)")
 
         blocking = [item for item in missing if not item.startswith("summary")]
-        return {
-            "post_id": post_id,
-            "is_draft": post.get("isDraft"),
-            "ready": post.get("isDraft") is True and not blocking,
-            "missing": missing,
-        }
+        return Readiness(
+            post_id=post_id,
+            is_draft=post.get("isDraft"),
+            ready=post.get("isDraft") is True and not blocking,
+            missing=missing,
+        )
 
     # -- writing ------------------------------------------------------------------------
 
@@ -189,7 +190,7 @@ def build_server(
         ] = None,
         repo_url: Annotated[str | None, Field(max_length=500)] = None,
         demo_url: Annotated[str | None, Field(max_length=500)] = None,
-    ) -> dict[str, Any]:
+    ) -> Post:
         """Creates a new post as a draft. Nothing is public until it is published."""
         payload = _clean(
             {
@@ -202,7 +203,7 @@ def build_server(
             }
         )
         post = await call(lambda c: c.create_post(payload))
-        return _post(post)
+        return Post.from_api(post)
 
     @server.tool(annotations=WRITE)
     async def update_draft(
@@ -215,7 +216,7 @@ def build_server(
         ] = None,
         repo_url: Annotated[str | None, Field(max_length=500)] = None,
         demo_url: Annotated[str | None, Field(max_length=500)] = None,
-    ) -> dict[str, Any]:
+    ) -> Post:
         """Changes a draft. Only the fields given change; the rest are kept. Refused for a
         published post — the user has to unpublish it from the studio first."""
         current = await call(lambda c: c.get_post(post_id))
@@ -236,7 +237,7 @@ def build_server(
             "isFeatured": current.get("isFeatured", False),
         }
         post = await call(lambda c: c.update_post(post_id, _clean(payload)))
-        return _post(post)
+        return Post.from_api(post)
 
     @server.tool(annotations=WRITE)
     async def request_upload(
@@ -254,7 +255,7 @@ def build_server(
             str | None,
             Field(max_length=200, description="Alt text. Describe what the image shows."),
         ] = None,
-    ) -> dict[str, Any]:
+    ) -> UploadTicket:
         """A one-time URL to upload one file to a draft. Send the file yourself:
         curl -sS -F "file=@/path/to/file" "<upload_url>"
         The link expires in minutes and works once. PNG, JPEG, GIF, WebP, MP4 and WebM are
@@ -262,27 +263,27 @@ def build_server(
         once set."""
         ticket = await call(lambda c: c.create_upload_ticket(post_id, role.capitalize(), caption))
         url = ticket["uploadUrl"]
-        return {
-            "upload_url": url,
-            "expires_at": ticket.get("expiresAt"),
-            "command": f'curl -sS --fail-with-body -F "file=@<path>" "{url}"',
-            "max_image_mb": round(ticket.get("maxImageBytes", 0) / 1_048_576),
-            "max_video_mb": round(ticket.get("maxVideoBytes", 0) / 1_048_576),
-            "after_upload": (
+        return UploadTicket(
+            upload_url=url,
+            expires_at=ticket.get("expiresAt"),
+            command=f'curl -sS --fail-with-body -F "file=@<path>" "{url}"',
+            max_image_mb=round(ticket.get("maxImageBytes", 0) / 1_048_576),
+            max_video_mb=round(ticket.get("maxVideoBytes", 0) / 1_048_576),
+            after_upload=(
                 "The response is JSON for the stored file. Embed an attachment in the body with "
                 "![caption](/api/media/<id>/content), or take the `markdown` from list_media."
             ),
-        }
+        )
 
     @server.tool(annotations=WRITE)
     async def set_media_caption(
         post_id: PostId,
         media_id: Annotated[int, Field(description="From list_media.")],
         caption: Annotated[str | None, Field(max_length=200)],
-    ) -> dict[str, Any]:
+    ) -> Media:
         """Rewrites a file's caption, which is its alt text. Drafts only."""
         media = await call(lambda c: c.update_media(post_id, media_id, caption))
-        return _media(media)
+        return Media.from_api(media)
 
     @server.tool(
         annotations=ToolAnnotations(
@@ -300,7 +301,7 @@ def build_server(
                 )
             ),
         ],
-    ) -> dict[str, Any]:
+    ) -> Post:
         """Publishes a draft to the user's public portfolio, where it is also indexed as evidence
         recruiters can cite. Only on the user's explicit instruction. This connection cannot
         unpublish it afterwards — only the user can, from the studio."""
@@ -311,7 +312,7 @@ def build_server(
             )
 
         post = await call(lambda c: c.publish(post_id))
-        return _post(post)
+        return Post.from_api(post)
 
     return server
 
@@ -343,54 +344,5 @@ def build_app(settings: Settings) -> Starlette:
     return app
 
 
-# ---------------------------------------------------------------------------------------
-# Shaping the API's answers for a model: fewer fields, plain names, nothing it cannot use.
-# ---------------------------------------------------------------------------------------
-
-
 def _clean(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value is not None}
-
-
-def _summary(item: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": item.get("id"),
-        "title": item.get("title"),
-        "slug": item.get("slug"),
-        "summary": item.get("summary"),
-        "status": "draft" if item.get("isDraft") else "published",
-        "published_at": item.get("publishedAt"),
-        "has_thumbnail": item.get("thumbnail") is not None,
-        "has_trailer": item.get("trailer") is not None,
-    }
-
-
-def _post(post: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": post.get("id"),
-        "title": post.get("title"),
-        "slug": post.get("slug"),
-        "summary": post.get("summary"),
-        "status": "draft" if post.get("isDraft") else "published",
-        "repo_url": post.get("repoUrl"),
-        "demo_url": post.get("demoUrl"),
-        "updated_at": post.get("updatedAt"),
-        "published_at": post.get("publishedAt"),
-        "body": post.get("body"),
-    }
-
-
-def _media(item: dict[str, Any]) -> dict[str, Any]:
-    caption = item.get("caption") or item.get("filename") or "asset"
-    url = item.get("url", "")
-    return {
-        "id": item.get("id"),
-        "role": str(item.get("role", "")).lower(),
-        "filename": item.get("filename"),
-        "caption": item.get("caption"),
-        "type": str(item.get("extension", "")).lower(),
-        "bytes": item.get("byteSize"),
-        # The same embed the studio's asset manager inserts: a path on the API, resolved by
-        # the site's Markdown renderer.
-        "markdown": f"![{caption}]({url})",
-    }
