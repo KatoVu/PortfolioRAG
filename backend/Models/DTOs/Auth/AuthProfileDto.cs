@@ -29,4 +29,10 @@ public class AuthProfileDto
 
     public IReadOnlyList<ExternalLoginProvider> LinkedProviders { get; init; } =
         Array.Empty<ExternalLoginProvider>();
+
+    /// <summary>
+    /// The scope of the API token making this request, or null for a studio session. How an
+    /// assistant learns which mode its connection is in.
+    /// </summary>
+    public ApiTokenScope? TokenScope { get; init; }
 }

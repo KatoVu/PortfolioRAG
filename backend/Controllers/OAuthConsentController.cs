@@ -65,4 +65,20 @@ public class OAuthConsentController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OAuthGrantDto>> RevokeGrant(int id, CancellationToken cancellationToken) =>
         Ok(await _oauth.RevokeGrantAsync(id, cancellationToken));
+
+    /// <summary>
+    /// Switches an app between drafts only and full editing. Applies to its very next
+    /// request, with no reconnecting. Session only, like everything here: an app may never
+    /// widen its own access.
+    /// </summary>
+    [HttpPut("grants/{id:int}/mode")]
+    [ProducesResponseType(typeof(OAuthGrantDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<OAuthGrantDto>> SetGrantMode(
+        int id,
+        [FromBody] GrantModeDto mode,
+        CancellationToken cancellationToken) =>
+        Ok(await _oauth.SetGrantModeAsync(id, mode, cancellationToken));
 }

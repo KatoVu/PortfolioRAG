@@ -83,6 +83,7 @@ public class AdminPostsController : ControllerBase
     public async Task<ActionResult<PostDto>> Publish(int id, CancellationToken cancellationToken) =>
         Ok(await _postService.PublishAsync(id, cancellationToken));
 
+    [AllowEditorScope]
     [HttpPost("{id:int}/unpublish")]
     [ProducesResponseType(typeof(PostDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -91,6 +92,7 @@ public class AdminPostsController : ControllerBase
     public async Task<ActionResult<PostDto>> Unpublish(int id, CancellationToken cancellationToken) =>
         Ok(await _postService.UnpublishAsync(id, cancellationToken));
 
+    [AllowEditorScope]
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

@@ -47,11 +47,23 @@ public class ConsentDescriptionDto
     public IReadOnlyList<string> Allows { get; init; } = [];
 
     public IReadOnlyList<string> NeverAllows { get; init; } = [];
+
+    /// <summary>What choosing full editing adds. The page lists it under that option, as a warning.</summary>
+    public IReadOnlyList<string> FullEditingAllows { get; init; } = [];
 }
 
 public class ConsentDecisionDto : AuthorizeRequestDto
 {
     public bool Approve { get; init; }
+
+    /// <summary>Full editing instead of drafts only. Switchable later from the studio.</summary>
+    public bool FullEditing { get; init; }
+}
+
+/// <summary>Switches a connected app between drafts only and full editing.</summary>
+public class GrantModeDto
+{
+    public bool FullEditing { get; init; }
 }
 
 /// <summary>Where the consent page sends the browser: back to the client, with a code or an error.</summary>
@@ -68,6 +80,9 @@ public class OAuthGrantDto
     public string ClientName { get; init; } = string.Empty;
 
     public string Scope { get; init; } = string.Empty;
+
+    /// <summary>True when the app may also edit live posts, replace artwork, unpublish and delete.</summary>
+    public bool FullEditing { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
 

@@ -54,6 +54,21 @@ public class ApiTokenRestrictionMiddleware
             }
         }
 
+        if (currentUser.ApiTokenScope == ApiTokenScope.Editor && !IsSafe(context.Request.Method))
+        {
+            var metadata = context.GetEndpoint()?.Metadata;
+
+            // NOTE: the same allowlist. Full editing widens what an assistant may do to a post,
+            // never what else of the account it may touch.
+            if (metadata?.GetMetadata<AllowAuthorScopeAttribute>() is null &&
+                metadata?.GetMetadata<AllowEditorScopeAttribute>() is null)
+            {
+                throw new ForbiddenException(
+                    "This API token can only change posts and their media. Make this change " +
+                    "from the studio instead.");
+            }
+        }
+
         return _next(context);
     }
 

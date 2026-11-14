@@ -17,7 +17,16 @@ public enum ApiTokenScope
     /// replacing artwork (which deletes the old file). Only endpoints marked
     /// <c>[AllowAuthorScope]</c> accept it for anything but a read.
     /// </summary>
-    Author = 2
+    Author = 2,
+
+    /// <summary>
+    /// An AI assistant the author switched to full editing: everything <see cref="Author"/>
+    /// may do, plus editing a live post, replacing artwork, unpublishing and deleting — but
+    /// only on posts and their media. Only endpoints marked <c>[AllowAuthorScope]</c> or
+    /// <c>[AllowEditorScope]</c> accept it for anything but a read, so the profile, timeline,
+    /// credentials and account stay closed. Only ever minted by the OAuth flow.
+    /// </summary>
+    Editor = 3
 }
 
 /// <summary>

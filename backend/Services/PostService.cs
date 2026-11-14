@@ -128,7 +128,7 @@ public class PostService : IPostService
         post.Body = dto.Body;
         // NOTE: which project is the showcase is the author's call. An assistant's edit keeps
         // whatever the studio last set rather than resetting it with a default false.
-        if (!IsAuthorScoped)
+        if (!IsAssistant)
             post.IsFeatured = dto.IsFeatured;
         post.RepoUrl = Clean(dto.RepoUrl);
         post.DemoUrl = Clean(dto.DemoUrl);
@@ -298,6 +298,8 @@ public class PostService : IPostService
     }
 
     private bool IsAuthorScoped => _currentUser.ApiTokenScope == ApiTokenScope.Author;
+
+    private bool IsAssistant => _currentUser.ApiTokenScope is ApiTokenScope.Author or ApiTokenScope.Editor;
 
     /// <summary>
     /// An assistant may only rewrite drafts. A live post is already in the job-fit index,

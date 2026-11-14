@@ -21,8 +21,9 @@ namespace Backend.Services;
 /// clients only; nothing here ever holds a client secret.
 /// </para>
 /// <para>
-/// The access token it issues is an ordinary <c>pfl_</c> API token with the
-/// <see cref="ApiTokenScope.Author"/> scope and an hour to live, so every rule the API
+/// The access token it issues is an ordinary <c>pfl_</c> API token with an hour to live and
+/// the grant's mode — <see cref="ApiTokenScope.Author"/>, or <see cref="ApiTokenScope.Editor"/>
+/// when the author chose full editing — so every rule the API
 /// already enforces on tokens applies to it unchanged, and revoking it is the same write.
 /// </para>
 /// <para>
@@ -32,8 +33,12 @@ namespace Backend.Services;
 /// </summary>
 public partial class OAuthService : IOAuthService
 {
-    /// <summary>The one scope there is. Anything else a client asks for is dropped, not refused.</summary>
-    public const string PostsScope = "posts";
+    /// <summary>
+    /// What a client gets by asking. Anything else it asks for is dropped, not refused: full
+    /// editing (<see cref="OAuthGrant.EditScope"/>) is the author's to grant on the consent
+    /// page or from the studio, never the client's to request.
+    /// </summary>
+    public const string PostsScope = OAuthGrant.PostsScope;
 
     private const int MaxRedirectUris = 5;
 
@@ -73,9 +78,6 @@ public partial class OAuthService : IOAuthService
         _logger = logger;
     }
 
-    // ---------------------------------------------------------------------------
-    // Discovery
-    // ---------------------------------------------------------------------------
 
     public IReadOnlyDictionary<string, object> GetMetadata()
     {
@@ -94,14 +96,11 @@ public partial class OAuthService : IOAuthService
             ["code_challenge_methods_supported"] = new[] { "S256" },
             ["token_endpoint_auth_methods_supported"] = new[] { "none" },
             ["revocation_endpoint_auth_methods_supported"] = new[] { "none" },
-            ["scopes_supported"] = new[] { PostsScope },
+            ["scopes_supported"] = new[] { PostsScope, OAuthGrant.EditScope },
             ["authorization_response_iss_parameter_supported"] = true
         };
     }
 
-    // ---------------------------------------------------------------------------
-    // Registration
-    // ---------------------------------------------------------------------------
 
     public async Task<ClientRegistrationResponseDto> RegisterClientAsync(
         ClientRegistrationRequestDto request,
@@ -182,9 +181,6 @@ public partial class OAuthService : IOAuthService
         };
     }
 
-    // ---------------------------------------------------------------------------
-    // Authorization
-    // ---------------------------------------------------------------------------
 
     public async Task<string> BeginAuthorizationAsync(
         AuthorizeRequestDto request,
@@ -245,6 +241,13 @@ public partial class OAuthService : IOAuthService
                 "Edit or unpublish a post that is already live",
                 "Replace an existing thumbnail or trailer",
                 "Touch your profile, timeline, credentials or account"
+            ],
+            FullEditingAllows =
+            [
+                "Edit posts that are already live",
+                "Replace a thumbnail or trailer, which deletes the old file",
+                "Unpublish a post",
+                "Delete posts and their files, which cannot be undone"
             ]
         };
     }
@@ -281,7 +284,7 @@ public partial class OAuthService : IOAuthService
             AuthorId = authorId,
             RedirectUri = validated.RedirectUri,
             CodeChallenge = validated.CodeChallenge,
-            Scope = validated.Scope,
+            Scope = OAuthGrant.ScopeFor(decision.FullEditing),
             Resource = validated.Resource,
             CreatedAt = now,
             ExpiresAt = now.AddSeconds(_options.AuthorizationCodeSeconds)
@@ -365,9 +368,6 @@ public partial class OAuthService : IOAuthService
         return new ValidatedRequest(client, request.RedirectUri, request.CodeChallenge, PostsScope, resource);
     }
 
-    // ---------------------------------------------------------------------------
-    // Tokens
-    // ---------------------------------------------------------------------------
 
     public Task<TokenResponseDto> ExchangeAsync(TokenRequestDto request, CancellationToken cancellationToken = default)
     {
@@ -529,7 +529,8 @@ public partial class OAuthService : IOAuthService
             Name = name,
             TokenHash = accessHash,
             Prefix = preview,
-            Scope = ApiTokenScope.Author,
+            // NOTE: a record of the mode at minting only. Requests read the grant's current mode.
+            Scope = grant.TokenScope,
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(_options.AccessTokenMinutes)
         });
@@ -587,9 +588,6 @@ public partial class OAuthService : IOAuthService
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Connected apps
-    // ---------------------------------------------------------------------------
 
     public async Task<IReadOnlyList<OAuthGrantDto>> GetGrantsAsync(CancellationToken cancellationToken = default)
     {
@@ -614,20 +612,44 @@ public partial class OAuthService : IOAuthService
         return ToDto(grant);
     }
 
+    public async Task<OAuthGrantDto> SetGrantModeAsync(
+        int id,
+        GrantModeDto mode,
+        CancellationToken cancellationToken = default)
+    {
+        var authorId = _currentUser.RequireAuthorId();
+
+        var grant = await _oauth.GetGrantAsync(id, authorId, cancellationToken)
+            ?? throw NotFoundException.For("Connected app", id);
+
+        if (grant.RevokedAt is not null)
+            throw new ConflictException("This app is disconnected. Connect it again to use it.");
+
+        // Takes effect on the app's next request: its tokens read the mode off the grant.
+        grant.Scope = OAuthGrant.ScopeFor(mode.FullEditing);
+        await _oauth.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Author {AuthorId} set OAuth grant {GrantId} to {Mode}.",
+            authorId,
+            grant.Id,
+            mode.FullEditing ? "full editing" : "drafts only");
+
+        return ToDto(grant);
+    }
+
     private static OAuthGrantDto ToDto(OAuthGrant grant) => new()
     {
         Id = grant.Id,
         ClientName = grant.Client.ClientName,
         Scope = grant.Scope,
+        FullEditing = grant.FullEditing,
         CreatedAt = grant.CreatedAt,
         LastUsedAt = grant.LastUsedAt,
         RevokedAt = grant.RevokedAt,
         IsActive = grant.RevokedAt is null
     };
 
-    // ---------------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------------
 
     private void EnsureConfigured()
     {

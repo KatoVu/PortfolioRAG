@@ -402,17 +402,90 @@ public class OAuthTests
         await harness.Context.SaveChangesAsync();
         harness.Context.ChangeTracker.Clear();
 
-        var handler = new ApiTokenAuthenticationHandler(
-            new StaticOptionsMonitor(), NullLoggerFactory.Instance, UrlEncoder.Default, harness.ApiTokens, harness.TimeProvider);
-        var http = new DefaultHttpContext();
-        http.Request.Headers.Authorization = $"Bearer {tokens.AccessToken}";
-        await handler.InitializeAsync(
-            new AuthenticationScheme("ApiToken", null, typeof(ApiTokenAuthenticationHandler)), http);
-
-        var result = await handler.AuthenticateAsync();
+        var result = await AuthenticateAsync(harness, tokens.AccessToken);
 
         Assert.True(access.IsActive(harness.TimeProvider.GetUtcNow()));
         Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task Drafts_only_is_the_default_and_full_editing_is_the_authors_choice()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var (draftsClient, draftsCode) = await AuthorizeAsync(harness);
+        var (fullClient, fullCode) = await AuthorizeAsync(harness, fullEditing: true);
+
+        var drafts = await harness.OAuth.ExchangeAsync(CodeExchange(draftsClient, draftsCode));
+        var full = await harness.OAuth.ExchangeAsync(CodeExchange(fullClient, fullCode));
+
+        Assert.Equal(ApiTokenScope.Author, await ScopeOfAsync(harness, drafts.AccessToken));
+        Assert.Equal(ApiTokenScope.Editor, await ScopeOfAsync(harness, full.AccessToken));
+        Assert.Equal("posts posts:edit", full.Scope);
+
+        var refreshed = await harness.OAuth.ExchangeAsync(
+            new TokenRequestDto { GrantType = "refresh_token", ClientId = fullClient, RefreshToken = full.RefreshToken });
+        Assert.Equal(ApiTokenScope.Editor, await ScopeOfAsync(harness, refreshed.AccessToken));
+    }
+
+    [Fact]
+    public async Task Switching_the_mode_applies_to_the_token_the_app_already_holds()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var author = await harness.AddAuthorAsync("author@example.com", "a long enough password");
+        var (clientId, code) = await AuthorizeAsync(harness, author);
+        var tokens = await harness.OAuth.ExchangeAsync(CodeExchange(clientId, code));
+        harness.SignIn(author);
+        var grantId = (await harness.OAuth.GetGrantsAsync()).Single().Id;
+
+        var up = await harness.OAuth.SetGrantModeAsync(grantId, new GrantModeDto { FullEditing = true });
+        harness.Context.ChangeTracker.Clear();
+        Assert.True(up.FullEditing);
+        Assert.Equal(ApiTokenScope.Editor, await ScopeOfAsync(harness, tokens.AccessToken));
+
+        await harness.OAuth.SetGrantModeAsync(grantId, new GrantModeDto { FullEditing = false });
+        harness.Context.ChangeTracker.Clear();
+        Assert.Equal(ApiTokenScope.Author, await ScopeOfAsync(harness, tokens.AccessToken));
+    }
+
+    [Fact]
+    public async Task Only_the_owner_can_switch_a_live_grant()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var owner = await harness.AddAuthorAsync("owner@example.com", "a long enough password");
+        var stranger = await harness.AddAuthorAsync("stranger@example.com", "a long enough password");
+        var (clientId, code) = await AuthorizeAsync(harness, owner);
+        await harness.OAuth.ExchangeAsync(CodeExchange(clientId, code));
+        harness.SignIn(owner);
+        var grantId = (await harness.OAuth.GetGrantsAsync()).Single().Id;
+
+        harness.SignIn(stranger);
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            harness.OAuth.SetGrantModeAsync(grantId, new GrantModeDto { FullEditing = true }));
+
+        harness.SignIn(owner);
+        await harness.OAuth.RevokeGrantAsync(grantId);
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            harness.OAuth.SetGrantModeAsync(grantId, new GrantModeDto { FullEditing = true }));
+    }
+
+    /// <summary>Runs the real API token handler over one bearer token.</summary>
+    private static async Task<AuthenticateResult> AuthenticateAsync(TestHarness harness, string token)
+    {
+        var handler = new ApiTokenAuthenticationHandler(
+            new StaticOptionsMonitor(), NullLoggerFactory.Instance, UrlEncoder.Default, harness.ApiTokens, harness.TimeProvider);
+        var http = new DefaultHttpContext();
+        http.Request.Headers.Authorization = $"Bearer {token}";
+        await handler.InitializeAsync(
+            new AuthenticationScheme("ApiToken", null, typeof(ApiTokenAuthenticationHandler)), http);
+
+        return await handler.AuthenticateAsync();
+    }
+
+    private static async Task<ApiTokenScope> ScopeOfAsync(TestHarness harness, string token)
+    {
+        var result = await AuthenticateAsync(harness, token);
+        Assert.True(result.Succeeded);
+        return Enum.Parse<ApiTokenScope>(result.Principal!.FindFirst(AuthClaims.ApiTokenScope)!.Value);
     }
 
     private sealed class StaticOptionsMonitor : IOptionsMonitor<AuthenticationSchemeOptions>
@@ -469,8 +542,6 @@ public class OAuthTests
         Assert.Equal(new[] { "none" }, metadata["token_endpoint_auth_methods_supported"]);
     }
 
-    // ------------------------------------------------------------------
-
     private static async Task<string> RegisterAsync(TestHarness harness)
     {
         var client = await harness.OAuth.RegisterClientAsync(
@@ -490,7 +561,7 @@ public class OAuthTests
         Resource = "https://mcp.example.com/mcp"
     };
 
-    private static ConsentDecisionDto Decision(AuthorizeRequestDto request, bool approve) => new()
+    private static ConsentDecisionDto Decision(AuthorizeRequestDto request, bool approve, bool fullEditing = false) => new()
     {
         ClientId = request.ClientId,
         RedirectUri = request.RedirectUri,
@@ -500,22 +571,26 @@ public class OAuthTests
         State = request.State,
         Scope = request.Scope,
         Resource = request.Resource,
-        Approve = approve
+        Approve = approve,
+        FullEditing = fullEditing
     };
 
-    private static async Task<string> ApproveAsync(TestHarness harness, AuthorizeRequestDto request)
+    private static async Task<string> ApproveAsync(TestHarness harness, AuthorizeRequestDto request, bool fullEditing = false)
     {
-        var result = await harness.OAuth.DecideConsentAsync(Decision(request, approve: true));
+        var result = await harness.OAuth.DecideConsentAsync(Decision(request, approve: true, fullEditing));
         return QueryHelpers.ParseQuery(new Uri(result.RedirectUrl).Query)["code"].ToString();
     }
 
-    private static async Task<(string ClientId, string Code)> AuthorizeAsync(TestHarness harness, Author? author = null)
+    private static async Task<(string ClientId, string Code)> AuthorizeAsync(
+        TestHarness harness,
+        Author? author = null,
+        bool fullEditing = false)
     {
         author ??= await harness.AddAuthorAsync($"{Guid.NewGuid():N}@example.com", "a long enough password");
         var clientId = await RegisterAsync(harness);
 
         harness.SignIn(author);
-        var code = await ApproveAsync(harness, Request(clientId));
+        var code = await ApproveAsync(harness, Request(clientId), fullEditing);
         harness.SignOut();
 
         return (clientId, code);

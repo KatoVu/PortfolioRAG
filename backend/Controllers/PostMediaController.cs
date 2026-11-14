@@ -113,6 +113,7 @@ public class PostMediaController : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await _mediaService.UpdateAsync(postId, mediaId, dto, cancellationToken));
 
+    [AllowEditorScope]
     [HttpDelete("{mediaId:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

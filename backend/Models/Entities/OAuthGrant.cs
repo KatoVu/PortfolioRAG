@@ -17,8 +17,29 @@ public class OAuthGrant
 
     public OAuthClient Client { get; set; } = null!;
 
-    /// <summary>The scope string approved, as the client asked for it.</summary>
+    /// <summary>Drafts only: read, write drafts, publish. What every grant has.</summary>
+    public const string PostsScope = "posts";
+
+    /// <summary>Full editing, on top of <see cref="PostsScope"/>. The author's choice, and theirs to take back.</summary>
+    public const string EditScope = "posts:edit";
+
+    /// <summary>
+    /// The scope approved: <c>posts</c>, or <c>posts posts:edit</c> for full editing. The
+    /// author can switch it from the studio, and it applies to the grant's tokens at once.
+    /// </summary>
     public string Scope { get; set; } = string.Empty;
+
+    public bool FullEditing => Scope.Split(' ').Contains(EditScope);
+
+    /// <summary>
+    /// What this grant's tokens may do. Read from the grant on every request rather than off
+    /// the token, so switching the mode needs no new token and has no window where an old one
+    /// still carries the old mode.
+    /// </summary>
+    public ApiTokenScope TokenScope => FullEditing ? ApiTokenScope.Editor : ApiTokenScope.Author;
+
+    public static string ScopeFor(bool fullEditing) =>
+        fullEditing ? $"{PostsScope} {EditScope}" : PostsScope;
 
     /// <summary>The resource (RFC 8707) the tokens were issued for, if the client named one.</summary>
     public string? Resource { get; set; }

@@ -76,7 +76,8 @@ public static class MappingExtensions
     /// </summary>
     public static AuthProfileDto ToProfileDto(
         this Author author,
-        IReadOnlyList<ExternalLoginProvider> linkedProviders) => new()
+        IReadOnlyList<ExternalLoginProvider> linkedProviders,
+        ApiTokenScope? tokenScope = null) => new()
     {
         Id = author.Id,
         Name = author.Name,
@@ -87,7 +88,8 @@ public static class MappingExtensions
         CreatedAt = author.CreatedAt,
         HasPassword = author.PasswordHash is not null,
         IsEmailConfirmed = author.EmailConfirmedAt is not null,
-        LinkedProviders = linkedProviders
+        LinkedProviders = linkedProviders,
+        TokenScope = tokenScope
     };
 
     /// <summary>

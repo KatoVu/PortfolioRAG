@@ -42,4 +42,7 @@ public interface IOAuthService
 
     /// <summary>Disconnects an app: its grant and every token it holds stop working at once.</summary>
     Task<OAuthGrantDto> RevokeGrantAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Switches an app between drafts only and full editing, effective on its next request.</summary>
+    Task<OAuthGrantDto> SetGrantModeAsync(int id, GrantModeDto mode, CancellationToken cancellationToken = default);
 }
