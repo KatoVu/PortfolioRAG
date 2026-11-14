@@ -1,8 +1,10 @@
 using Backend.Common.Exceptions;
 using Backend.Common.Options;
 using Backend.Common.Security;
+using Backend.Data;
 using Backend.Models.DTOs.OAuth;
 using Backend.Models.Entities;
+using Backend.Repositories;
 using Backend.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -288,6 +290,39 @@ public class OAuthTests
         var refresh = await Assert.ThrowsAsync<OAuthException>(() => harness.OAuth.ExchangeAsync(
             new TokenRequestDto { GrantType = "refresh_token", ClientId = clientId, RefreshToken = first.RefreshToken }));
         Assert.Equal("invalid_grant", refresh.Error);
+    }
+
+    [Fact]
+    public async Task Spending_a_code_twice_at_once_still_revokes_the_winner()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var (clientId, code) = await AuthorizeAsync(harness);
+
+        await using var rivalContext = new BlogDbContext(new DbContextOptionsBuilder<BlogDbContext>()
+            .UseNpgsql(harness.Context.Database.GetConnectionString())
+            .Options);
+        var rival = new OAuthService(
+            new OAuthRepository(rivalContext),
+            new ApiTokenRepository(rivalContext),
+            harness.CurrentUser,
+            harness.TimeProvider,
+            Options.Create(harness.OAuthOptions),
+            NullLogger<OAuthService>.Instance);
+
+        var attempts = new[]
+        {
+            harness.OAuth.ExchangeAsync(CodeExchange(clientId, code)),
+            rival.ExchangeAsync(CodeExchange(clientId, code))
+        };
+
+        try { await Task.WhenAll(attempts); } catch (OAuthException) { }
+
+        var winner = Assert.Single(attempts, a => a.IsCompletedSuccessfully);
+        Assert.IsType<OAuthException>(Assert.Single(attempts, a => a.IsFaulted).Exception!.InnerException);
+
+        harness.Context.ChangeTracker.Clear();
+        var access = await harness.ApiTokens.GetByHashAsync(ApiTokenGenerator.Hash((await winner).AccessToken), tracked: false);
+        Assert.NotNull(access!.RevokedAt);
     }
 
     [Fact]

@@ -402,7 +402,7 @@ public partial class OAuthService : IOAuthService
             throw InvalidGrant("The authorization code is not valid.");
 
         if (code.ConsumedAt is not null)
-            await RevokeReplayedCodeAsync(code, client, now, cancellationToken);
+            await RevokeReplayedCodeAsync(code.OAuthGrantId, client, now, cancellationToken);
 
         if (code.ExpiresAt <= now)
             throw InvalidGrant("The authorization code has expired. Start the sign-in again.");
@@ -422,8 +422,17 @@ public partial class OAuthService : IOAuthService
             throw new OAuthException("invalid_target", "resource does not match the one that was authorized.");
         }
 
+        // NOTE: consuming the code, minting and linking the grant commit together, so nobody can
+        // see a spent code without the grant it produced. A rival's consume waits on our row
+        // lock, so by the time it loses, the grant id it reads back is committed.
+        await using var transaction = await _oauth.BeginTransactionAsync(cancellationToken);
+
         if (!await _oauth.TryConsumeCodeAsync(code.Id, now, cancellationToken))
-            await RevokeReplayedCodeAsync(code, client, now, cancellationToken);
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            var spentGrant = await _oauth.GetCodeGrantIdAsync(code.Id, cancellationToken);
+            await RevokeReplayedCodeAsync(spentGrant, client, now, cancellationToken);
+        }
 
         var grant = new OAuthGrant
         {
@@ -440,6 +449,7 @@ public partial class OAuthService : IOAuthService
 
         code.OAuthGrantId = grant.Id;
         await _oauth.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Issued grant {GrantId} to client {ClientId} for author {AuthorId}.",
@@ -455,12 +465,12 @@ public partial class OAuthService : IOAuthService
     /// produced is cut off (RFC 6749 §4.1.2). Always throws.
     /// </summary>
     private async Task RevokeReplayedCodeAsync(
-        OAuthAuthorizationCode code,
+        int? grantId,
         OAuthClient client,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (code.OAuthGrantId is { } spentGrant)
+        if (grantId is { } spentGrant)
         {
             await _oauth.RevokeGrantAsync(spentGrant, now, cancellationToken);
             _logger.LogWarning(

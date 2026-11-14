@@ -1,4 +1,5 @@
 using Backend.Models.Entities;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Backend.Repositories;
 
@@ -19,6 +20,11 @@ public interface IOAuthRepository
     /// so two requests racing with the same code cannot both win.
     /// </summary>
     Task<bool> TryConsumeCodeAsync(int codeId, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>The grant a code produced, read fresh from the database rather than the tracker.</summary>
+    Task<int?> GetCodeGrantIdAsync(int codeId, CancellationToken cancellationToken = default);
+
+    Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 
     Task AddGrantAsync(OAuthGrant grant, CancellationToken cancellationToken = default);
 

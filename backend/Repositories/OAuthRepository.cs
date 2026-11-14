@@ -1,6 +1,7 @@
 using Backend.Data;
 using Backend.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Backend.Repositories;
 
@@ -43,6 +44,15 @@ public class OAuthRepository : IOAuthRepository
 
         return won;
     }
+
+    public Task<int?> GetCodeGrantIdAsync(int codeId, CancellationToken cancellationToken = default) =>
+        _context.OAuthAuthorizationCodes
+            .Where(c => c.Id == codeId)
+            .Select(c => c.OAuthGrantId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        _context.Database.BeginTransactionAsync(cancellationToken);
 
     public async Task AddGrantAsync(OAuthGrant grant, CancellationToken cancellationToken = default) =>
         await _context.OAuthGrants.AddAsync(grant, cancellationToken);
