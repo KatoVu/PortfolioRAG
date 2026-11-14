@@ -6,7 +6,9 @@ using Backend.Mapping;
 using Backend.Models.DTOs;
 using Backend.Models.Entities;
 using Backend.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Backend.Services;
 
@@ -117,7 +119,9 @@ public class MediaService : IMediaService
         // A post leads with one thumbnail and one trailer, so uploading either replaces
         // what was there. Removed in the same transaction as the insert: a unique index
         // holds the rule, and leaving both rows in place for even a moment would trip it.
-        var replaced = role == MediaRole.Attachment
+        // An assistant never replaces: its check above can go stale while the file uploads,
+        // so it skips the lookup and lets that same index refuse a thumbnail that raced in.
+        var replaced = role == MediaRole.Attachment || authorScoped
             ? null
             : (await _medias.GetByPostIdAsync(postId, cancellationToken))
                 .FirstOrDefault(item => item.Role == role);
@@ -129,6 +133,12 @@ public class MediaService : IMediaService
 
             await _medias.AddAsync(media, cancellationToken);
             await _medias.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            authorScoped && exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            await TryDeleteObjectAsync(stored.ObjectKey, cancellationToken);
+            throw CannotReplace(role);
         }
         catch
         {
@@ -253,12 +263,12 @@ public class MediaService : IMediaService
         var existing = await _medias.GetByPostIdAsync(post.Id, cancellationToken);
 
         if (existing.Any(item => item.Role == role))
-        {
-            throw new ConflictException(
-                $"This post already has a {role.ToString().ToLowerInvariant()}, and this token cannot " +
-                "replace it because that would delete the old file. Remove it from the studio first.");
-        }
+            throw CannotReplace(role);
     }
+
+    private static ConflictException CannotReplace(MediaRole role) =>
+        new($"This post already has a {role.ToString().ToLowerInvariant()}, and this token cannot " +
+            "replace it because that would delete the old file. Remove it from the studio first.");
 
     /// <summary>
     /// The author's view of an upload, with a link the editor can draw without a round trip

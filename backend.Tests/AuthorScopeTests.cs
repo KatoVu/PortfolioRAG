@@ -89,6 +89,42 @@ public class AuthorScopeTests
     }
 
     [Fact]
+    public async Task A_thumbnail_that_races_in_during_the_upload_is_not_replaced()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var author = await harness.AddAuthorAsync("author@example.com", "a long enough password");
+        var post = await harness.AddPostAsync(author, isDraft: true);
+        var theirs = new Media
+        {
+            Filename = "theirs.webp",
+            ObjectKey = $"authors/{author.Id}/posts/{post.Id}/theirs.webp",
+            ByteSize = 64,
+            Extension = MediaExtension.Webp,
+            Role = MediaRole.Thumbnail,
+            PostId = post.Id,
+            CreatedAt = harness.TimeProvider.GetUtcNow()
+        };
+
+        // The check passes on an empty post; the studio's thumbnail lands while the file uploads.
+        harness.Storage.FailUpload = _ =>
+        {
+            harness.Storage.FailUpload = null;
+            harness.Context.Medias.Add(theirs);
+            harness.Context.SaveChanges();
+            return null;
+        };
+
+        harness.SignInWithToken(author, ApiTokenScope.Author);
+        await Assert.ThrowsAsync<ConflictException>(() => harness.MediaService.AddToPostAsync(
+            post.Id, TestFiles.FormFile(TestFiles.Png(), "bot.png"), MediaRole.Thumbnail));
+
+        harness.Context.ChangeTracker.Clear();
+        var media = Assert.Single(await harness.Context.Medias.Where(m => m.PostId == post.Id).ToListAsync());
+        Assert.Equal(theirs.Id, media.Id);
+        Assert.Empty(harness.Storage.Objects);
+    }
+
+    [Fact]
     public async Task A_session_can_still_replace_artwork()
     {
         await using var harness = await TestHarness.CreateAsync();
