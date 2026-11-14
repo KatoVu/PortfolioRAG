@@ -45,7 +45,9 @@ public class ApiTokenAuthenticationHandler : AuthenticationHandler<Authenticatio
 
         var now = _timeProvider.GetUtcNow();
 
-        if (!stored.IsActive(now))
+        // NOTE: the grant too, not just the token. A refresh racing a disconnect can save a
+        // fresh token after the bulk revoke already ran, and that token must die with the grant.
+        if (!stored.IsActive(now) || stored.OAuthGrant?.RevokedAt is not null)
         {
             Logger.LogInformation(
                 "Rejected an inactive API token {TokenId} for author {AuthorId}.",

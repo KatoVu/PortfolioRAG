@@ -47,6 +47,7 @@ public class ApiTokenRepository : IApiTokenRepository
 
         return query
             .Include(t => t.Author)
+            .Include(t => t.OAuthGrant)
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
     }
 

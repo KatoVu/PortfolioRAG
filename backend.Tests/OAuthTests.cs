@@ -4,10 +4,13 @@ using Backend.Common.Security;
 using Backend.Models.DTOs.OAuth;
 using Backend.Models.Entities;
 using Backend.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.Text.Encodings.Web;
 
 namespace Backend.Tests;
 
@@ -382,6 +385,43 @@ public class OAuthTests
         harness.SignIn(author);
 
         Assert.Empty(await harness.Auth.GetApiTokensAsync());
+    }
+
+    [Fact]
+    public async Task A_token_minted_after_its_grant_was_revoked_does_not_authenticate()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var (clientId, code) = await AuthorizeAsync(harness);
+        var tokens = await harness.OAuth.ExchangeAsync(CodeExchange(clientId, code));
+
+        // A refresh racing a disconnect: the grant is revoked but this token was saved after
+        // the bulk revoke ran, so the token itself still looks live.
+        harness.Context.ChangeTracker.Clear();
+        var access = await harness.ApiTokens.GetByHashAsync(ApiTokenGenerator.Hash(tokens.AccessToken));
+        access!.OAuthGrant!.RevokedAt = harness.TimeProvider.GetUtcNow();
+        await harness.Context.SaveChangesAsync();
+        harness.Context.ChangeTracker.Clear();
+
+        var handler = new ApiTokenAuthenticationHandler(
+            new StaticOptionsMonitor(), NullLoggerFactory.Instance, UrlEncoder.Default, harness.ApiTokens, harness.TimeProvider);
+        var http = new DefaultHttpContext();
+        http.Request.Headers.Authorization = $"Bearer {tokens.AccessToken}";
+        await handler.InitializeAsync(
+            new AuthenticationScheme("ApiToken", null, typeof(ApiTokenAuthenticationHandler)), http);
+
+        var result = await handler.AuthenticateAsync();
+
+        Assert.True(access.IsActive(harness.TimeProvider.GetUtcNow()));
+        Assert.False(result.Succeeded);
+    }
+
+    private sealed class StaticOptionsMonitor : IOptionsMonitor<AuthenticationSchemeOptions>
+    {
+        public AuthenticationSchemeOptions CurrentValue { get; } = new();
+
+        public AuthenticationSchemeOptions Get(string? name) => CurrentValue;
+
+        public IDisposable? OnChange(Action<AuthenticationSchemeOptions, string?> listener) => null;
     }
 
     [Fact]
