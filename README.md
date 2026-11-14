@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/Postgres-pgvector-4169E1?logo=postgresql&logoColor=white" alt="Postgres + pgvector" />
   <img src="https://img.shields.io/badge/Python-RAG_worker-3776AB?logo=python&logoColor=white" alt="Python RAG worker" />
   <img src="https://img.shields.io/badge/Traefik-edge-24A1C1?logo=traefikproxy&logoColor=white" alt="Traefik" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License" />
 </p>
 
 ---
@@ -208,3 +209,9 @@ mcp-server/      Remote MCP server: lets an AI assistant write posts (OAuth, dra
 deploy/          Ansible, deploy/backup scripts, production runbook
 docs/            Detailed design, eval and testing notes
 ```
+
+---
+
+## License
+
+[MIT](LICENSE)
