@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { ApiTokenDto } from "@/lib/api/generated";
+import type { ApiTokenDto, ApiTokenScope } from "@/lib/api/generated";
 import { formatDate } from "@/lib/admin/format";
 import { formatRelative, tokenStatus } from "@/lib/admin/useApiTokens";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { StatusDot } from "../ui/StatusDot";
+
+const SCOPE_LABELS: Record<ApiTokenScope, string> = {
+  Read: "read only",
+  Write: "read + write",
+  Author: "drafts only",
+  Editor: "full editing",
+};
 
 type TokenRowProps = {
   token: ApiTokenDto;
@@ -52,8 +59,8 @@ export function TokenRow({ token, busy, onRotate, onRevoke, onForget }: TokenRow
             {name}
           </span>
 
-          <Badge tone={token.scope === "Write" ? "accent" : "outline"}>
-            {token.scope === "Write" ? "read + write" : token.scope === "Author" ? "drafts only" : "read only"}
+          <Badge tone={token.scope === "Write" || token.scope === "Editor" ? "accent" : "outline"}>
+            {SCOPE_LABELS[token.scope ?? "Read"]}
           </Badge>
 
           {status !== "active" ? (

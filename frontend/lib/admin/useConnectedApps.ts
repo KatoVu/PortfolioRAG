@@ -9,7 +9,7 @@ import { useToast } from "./useToast";
 /**
  * The apps an author has approved through OAuth — an AI assistant's connector, typically.
  * Unlike a token there is no secret to show and nothing to rotate: the app refreshes its own
- * access, so the only thing the author ever does here is disconnect one.
+ * access, so the author only ever switches an app's mode or disconnects it.
  */
 export function useConnectedApps() {
   const { session } = useAuth();
@@ -67,5 +67,28 @@ export function useConnectedApps() {
     [load, showToast],
   );
 
-  return { apps: apps.filter((app) => app.isActive), state, busy, disconnect };
+  const setMode = useCallback(
+    async (id: number, name: string, fullEditing: boolean) => {
+      setBusy(true);
+
+      try {
+        const updated = await oauthConsentApi.oAuthConsentSetGrantMode({
+          id,
+          grantModeDto: { fullEditing },
+        });
+        setApps((current) => current.map((app) => (app.id === id ? updated : app)));
+        showToast(
+          fullEditing ? `“${name}” can now edit and delete posts` : `“${name}” is back to drafts only`,
+          "info",
+        );
+      } catch (error) {
+        showToast(await describeError(error, "Could not change that app's access."), "error");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [showToast],
+  );
+
+  return { apps: apps.filter((app) => app.isActive), state, busy, disconnect, setMode };
 }

@@ -16,7 +16,8 @@ type Load =
 
 /**
  * Asks the signed-in author whether an app — an AI assistant's connector, in practice — may
- * write drafts for them. Either answer sends the browser back to the app.
+ * write for them, and how much: drafts only, or full editing. Either answer sends the
+ * browser back to the app. The mode can be switched later from the studio.
  *
  * Signing in happens on this screen rather than by a detour through /admin, so the request
  * in the URL is never lost between the two.
@@ -52,6 +53,7 @@ function Consent({ request }: { request: AuthorizeRequestDto }) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [deciding, setDeciding] = useState<null | "approve" | "deny">(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [fullEditing, setFullEditing] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -77,7 +79,7 @@ function Consent({ request }: { request: AuthorizeRequestDto }) {
 
     try {
       const result = await oauthConsentApi.oAuthConsentDecide({
-        consentDecisionDto: { ...request, approve },
+        consentDecisionDto: { ...request, approve, fullEditing: approve && fullEditing },
       });
 
       // NOTE: a full navigation, not the router: the target is the app's own redirect —
@@ -116,7 +118,7 @@ function Consent({ request }: { request: AuthorizeRequestDto }) {
         <div>
           <p className="font-mono text-[11px] tracking-wide text-warm-slate uppercase">Connect an app</p>
           <h1 className="mt-1 font-serif text-2xl font-medium text-warm-black">
-            {description.clientName} wants to write drafts for you
+            {description.clientName} wants to write posts for you
           </h1>
           <p className="mt-2 text-[13.5px] leading-relaxed text-warm-slate">
             The name is what the app calls itself — nothing has checked it. Only approve if you
@@ -124,12 +126,33 @@ function Consent({ request }: { request: AuthorizeRequestDto }) {
           </p>
         </div>
 
-        <List icon="check-circle" title="It will be able to" items={description.allows ?? []} />
-        <List icon="error" title="It will never be able to" items={description.neverAllows ?? []} />
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 text-[13px] font-semibold text-warm-black">How much can it do?</legend>
+
+          <ModeOption
+            checked={!fullEditing}
+            onSelect={() => setFullEditing(false)}
+            title="Drafts only"
+            hint="Recommended. Nothing it does can remove or change what is already live."
+          >
+            <List icon="check-circle" title="It will be able to" items={description.allows ?? []} />
+            <List icon="error" title="It will never be able to" items={description.neverAllows ?? []} />
+          </ModeOption>
+
+          <ModeOption
+            checked={fullEditing}
+            onSelect={() => setFullEditing(true)}
+            title="Full editing"
+            hint="Everything above, plus:"
+          >
+            <List icon="error" title="It will also be able to" items={description.fullEditingAllows ?? []} />
+          </ModeOption>
+        </fieldset>
 
         <p className="border-t border-warm-border/60 pt-3 text-xs leading-relaxed text-warm-slate">
-          Approving sends you back to {description.redirectTarget}. You can disconnect the app
-          at any time from the studio&apos;s Access tab, and its access ends at once.
+          Approving sends you back to {description.redirectTarget}. Either way it can never touch
+          your profile, timeline, credentials or account. You can switch its mode or disconnect
+          it at any time from the studio&apos;s Access tab.
         </p>
 
         {failure ? (
@@ -154,6 +177,45 @@ function Consent({ request }: { request: AuthorizeRequestDto }) {
         </div>
       </div>
     </Frame>
+  );
+}
+
+function ModeOption({
+  checked,
+  onSelect,
+  title,
+  hint,
+  children,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  title: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      className={
+        checked
+          ? "flex cursor-pointer flex-col gap-3 rounded border border-warm-black bg-warm-surface p-3"
+          : "flex cursor-pointer flex-col gap-3 rounded border border-warm-border bg-warm-sunken p-3"
+      }
+    >
+      <span className="flex items-start gap-2.5">
+        <input
+          type="radio"
+          name="mode"
+          checked={checked}
+          onChange={onSelect}
+          className="mt-[3px] accent-warm-black"
+        />
+        <span>
+          <span className="block text-[13.5px] font-medium text-warm-black">{title}</span>
+          <span className="block text-xs text-warm-slate">{hint}</span>
+        </span>
+      </span>
+      {checked ? <div className="flex flex-col gap-3 pl-6">{children}</div> : null}
+    </label>
   );
 }
 
