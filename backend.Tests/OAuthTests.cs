@@ -326,6 +326,24 @@ public class OAuthTests
     }
 
     [Fact]
+    public async Task A_refresh_for_another_resource_is_refused_and_spends_nothing()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var (clientId, code) = await AuthorizeAsync(harness);
+        var first = await harness.OAuth.ExchangeAsync(CodeExchange(clientId, code));
+
+        var refresh = new TokenRequestDto { GrantType = "refresh_token", ClientId = clientId, RefreshToken = first.RefreshToken };
+
+        var error = await Assert.ThrowsAsync<OAuthException>(() => harness.OAuth.ExchangeAsync(
+            new TokenRequestDto { GrantType = "refresh_token", ClientId = clientId, RefreshToken = first.RefreshToken, Resource = "https://evil.example.com/mcp" }));
+        Assert.Equal("invalid_target", error.Error);
+
+        // The refused attempt left the token unspent, so the real client can still rotate it.
+        var second = await harness.OAuth.ExchangeAsync(refresh);
+        Assert.NotEqual(first.RefreshToken, second.RefreshToken);
+    }
+
+    [Fact]
     public async Task A_refresh_rotates_and_the_old_token_stops_working()
     {
         await using var harness = await TestHarness.CreateAsync();

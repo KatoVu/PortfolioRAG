@@ -499,6 +499,12 @@ public partial class OAuthService : IOAuthService
         if (grant.RevokedAt is not null || stored.ExpiresAt <= now)
             throw InvalidGrant("The refresh token is not valid. Connect again.");
 
+        if (request.Resource is not null &&
+            !string.Equals(NormalizeResource(request.Resource), grant.Resource, StringComparison.Ordinal))
+        {
+            throw new OAuthException("invalid_target", "resource does not match the one that was authorized.");
+        }
+
         if (!await _oauth.TryConsumeRefreshTokenAsync(stored.Id, now, cancellationToken))
         {
             // NOTE: a spent refresh token coming back means it was copied. Rotation exists so
