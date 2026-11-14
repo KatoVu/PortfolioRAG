@@ -134,7 +134,23 @@ public class PostService : IPostService
         post.DemoUrl = Clean(dto.DemoUrl);
         post.UpdatedAt = _timeProvider.GetUtcNow();
 
-        await _posts.SaveChangesAsync(cancellationToken);
+        if (IsAuthorScoped)
+        {
+            // NOTE: the check above read the post at load time, and the studio may have
+            // published it since. Re-checked in the database, with the row locked until the
+            // edit commits, so a publish either lands first and the edit is refused, or waits.
+            await using var transaction = await _posts.BeginTransactionAsync(cancellationToken);
+
+            if (!await _posts.TryLockDraftAsync(post.Id, post.UpdatedAt, cancellationToken))
+                throw CannotEditPublished();
+
+            await _posts.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        else
+        {
+            await _posts.SaveChangesAsync(cancellationToken);
+        }
 
         // Drafts are never indexed, so only an edit to a live post moves the index.
         if (!post.IsDraft)
@@ -290,12 +306,12 @@ public class PostService : IPostService
     private void EnsureWritableByCaller(Post post)
     {
         if (IsAuthorScoped && !post.IsDraft)
-        {
-            throw new ForbiddenException(
-                "This token can only edit drafts, and this post is published. Unpublish it from " +
-                "the studio first if it should change.");
-        }
+            throw CannotEditPublished();
     }
+
+    private static ForbiddenException CannotEditPublished() =>
+        new("This token can only edit drafts, and this post is published. Unpublish it from " +
+            "the studio first if it should change.");
 
     private async Task<string> ResolveSlugAsync(
         string? requestedSlug,

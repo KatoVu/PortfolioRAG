@@ -68,6 +68,27 @@ public class AuthorScopeTests
     }
 
     [Fact]
+    public async Task It_cannot_edit_a_draft_that_was_published_while_it_was_editing()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var author = await harness.AddAuthorAsync("author@example.com", "a long enough password");
+        var post = await harness.AddPostAsync(author, isDraft: true);
+        harness.SignInWithToken(author, ApiTokenScope.Author);
+
+        // The studio publishes behind this context's back: the post it is tracking still
+        // says draft, as the one the assistant loaded would.
+        await harness.Context.Posts.Where(p => p.Id == post.Id)
+            .ExecuteUpdateAsync(set => set.SetProperty(p => p.IsDraft, false));
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => harness.PostService.UpdateAsync(
+            post.Id, new UpdatePostDto { Title = "Rewritten", Body = "rewritten" }));
+
+        harness.Context.ChangeTracker.Clear();
+        var stored = await harness.Context.Posts.SingleAsync(p => p.Id == post.Id);
+        Assert.NotEqual("rewritten", stored.Body);
+    }
+
+    [Fact]
     public async Task It_cannot_replace_artwork_because_replacing_deletes()
     {
         await using var harness = await TestHarness.CreateAsync();
