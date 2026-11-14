@@ -54,12 +54,8 @@ class BlogRagApi:
 
         raise ApiError(response.status_code, _describe(response))
 
-    # -- account ------------------------------------------------------------------------
-
     async def me(self) -> dict[str, Any]:
         return await self.request("GET", "/api/auth/me")
-
-    # -- posts --------------------------------------------------------------------------
 
     async def list_posts(
         self, *, is_draft: bool | None, search: str | None, page: int, page_size: int
@@ -83,7 +79,11 @@ class BlogRagApi:
     async def publish(self, post_id: int) -> dict[str, Any]:
         return await self.request("POST", f"/api/admin/posts/{post_id}/publish")
 
-    # -- media --------------------------------------------------------------------------
+    async def unpublish(self, post_id: int) -> dict[str, Any]:
+        return await self.request("POST", f"/api/admin/posts/{post_id}/unpublish")
+
+    async def delete_post(self, post_id: int) -> None:
+        await self.request("DELETE", f"/api/admin/posts/{post_id}")
 
     async def list_media(self, post_id: int) -> list[dict[str, Any]]:
         return await self.request("GET", f"/api/admin/posts/{post_id}/media")
@@ -103,6 +103,9 @@ class BlogRagApi:
         return await self.request(
             "PUT", f"/api/admin/posts/{post_id}/media/{media_id}", json={"caption": caption}
         )
+
+    async def delete_media(self, post_id: int, media_id: int) -> None:
+        await self.request("DELETE", f"/api/admin/posts/{post_id}/media/{media_id}")
 
 
 def _describe(response: httpx.Response) -> str:

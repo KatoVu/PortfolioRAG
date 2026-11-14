@@ -1,8 +1,10 @@
 """The MCP tools: read the author's posts, write drafts, illustrate them, and publish on request.
 
-There is deliberately no tool that deletes, unpublishes, or edits a live post. The API would
-refuse each of them on this token anyway — see ApiTokenScope.Author — but a tool the model can
-see invites it to try.
+A connection is in one of two modes, which the author picks on the consent page and can switch
+in the studio at any time: drafts only (ApiTokenScope.Author) or full editing
+(ApiTokenScope.Editor). The tool list cannot change per connection on a stateless server, so the
+full-editing tools are always listed and the API refuses them to a drafts-only token. The ones
+that cannot be undone still need the user's explicit say-so on every call.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from .auth import SCOPE, ApiTokenVerifier
 from .config import Settings
 from .models import (
     Account,
+    Deleted,
     Media,
     MediaList,
     Post,
@@ -42,10 +45,15 @@ logger = logging.getLogger(__name__)
 INSTRUCTIONS = """\
 Writes technical blog posts to the user's BlogRAG portfolio — as drafts.
 
-What this server can do: read the user's posts, create drafts, edit drafts, upload pictures and
-videos to a draft (including its thumbnail and trailer), and publish a draft. It can never delete
-anything, never edit or unpublish a post that is already live, and never replace an existing
-thumbnail or trailer.
+Each connection has a mode, set by the user in the BlogRAG studio. Call whoami to see it.
+- drafts_only: read the user's posts, create and edit drafts, upload pictures and videos to a draft
+  (including its thumbnail and trailer), and publish a draft. Never delete, never edit or unpublish
+  a live post, never replace an existing thumbnail or trailer.
+- full_editing: all of that, plus update_post on live posts, replacing artwork, unpublish_post,
+  delete_post and delete_media. Deleting cannot be undone: only delete what the user asked you to,
+  in this conversation, and pass user_confirmed=true only then.
+If a full-editing tool is refused, the connection is drafts_only: tell the user they can switch on
+full editing for this app under Access in the studio.
 
 Workflow:
 1. create_draft with the full Markdown body.
@@ -62,8 +70,19 @@ PostId = Annotated[
     int, Field(description="The post's numeric id, from list_posts or create_draft.")
 ]
 
+Confirmed = Annotated[
+    bool,
+    Field(
+        description=(
+            "True only if the user explicitly asked, in this conversation, for exactly this. "
+            "Never infer it."
+        )
+    ),
+]
+
 READ = ToolAnnotations(read_only_hint=True, open_world_hint=False)
 WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=False)
+DELETE = ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=False)
 
 
 def build_server(
@@ -109,8 +128,6 @@ def build_server(
                 return await fn(client, *args, **kwargs)
             except ApiError as error:
                 raise ToolError(error.message) from error
-
-    # -- reading ------------------------------------------------------------------------
 
     @server.tool(annotations=READ)
     async def whoami() -> Account:
@@ -170,8 +187,6 @@ def build_server(
             missing=missing,
         )
 
-    # -- writing ------------------------------------------------------------------------
-
     @server.tool(annotations=WRITE)
     async def create_draft(
         title: Annotated[str, Field(min_length=3, max_length=200)],
@@ -218,25 +233,36 @@ def build_server(
         demo_url: Annotated[str | None, Field(max_length=500)] = None,
     ) -> Post:
         """Changes a draft. Only the fields given change; the rest are kept. Refused for a
-        published post — the user has to unpublish it from the studio first."""
+        published post; use update_post for that, on a full-editing connection."""
         current = await call(lambda c: c.get_post(post_id))
         if not current.get("isDraft"):
             raise ToolError(
-                "This post is published, and this connection can only edit drafts. Ask the user "
-                "to unpublish it from the studio if it should change."
+                "This post is published, and update_draft only edits drafts. Use update_post if "
+                "this connection has full editing; otherwise the user can switch it on in the "
+                "studio."
             )
 
-        payload = {
-            "title": title if title is not None else current.get("title"),
-            "body": body if body is not None else current.get("body"),
-            "summary": summary if summary is not None else current.get("summary"),
-            "slug": slug if slug is not None else current.get("slug"),
-            "repoUrl": repo_url if repo_url is not None else current.get("repoUrl"),
-            "demoUrl": demo_url if demo_url is not None else current.get("demoUrl"),
-            # Ignored by the API for this token; sent because the endpoint requires the field.
-            "isFeatured": current.get("isFeatured", False),
-        }
-        post = await call(lambda c: c.update_post(post_id, _clean(payload)))
+        changes = _merged(current, title, body, summary, slug, repo_url, demo_url)
+        post = await call(lambda c: c.update_post(post_id, changes))
+        return Post.from_api(post)
+
+    @server.tool(annotations=WRITE)
+    async def update_post(
+        post_id: PostId,
+        title: Annotated[str | None, Field(min_length=3, max_length=200)] = None,
+        body: Annotated[str | None, Field(min_length=1, max_length=100_000)] = None,
+        summary: Annotated[str | None, Field(max_length=500)] = None,
+        slug: Annotated[
+            str | None, Field(max_length=200, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+        ] = None,
+        repo_url: Annotated[str | None, Field(max_length=500)] = None,
+        demo_url: Annotated[str | None, Field(max_length=500)] = None,
+    ) -> Post:
+        """Changes any post, live ones included; a live post stays live and its job-fit evidence
+        is re-indexed. Only the fields given change. Full-editing connections only."""
+        current = await call(lambda c: c.get_post(post_id))
+        changes = _merged(current, title, body, summary, slug, repo_url, demo_url)
+        post = await call(lambda c: c.update_post(post_id, changes))
         return Post.from_api(post)
 
     @server.tool(annotations=WRITE)
@@ -259,8 +285,8 @@ def build_server(
         """A one-time URL to upload one file to a draft. Send the file yourself:
         curl -sS -F "file=@/path/to/file" "<upload_url>"
         The link expires in minutes and works once. PNG, JPEG, GIF, WebP, MP4 and WebM are
-        accepted; pictures are re-encoded. A draft's thumbnail or trailer cannot be replaced
-        once set."""
+        accepted; pictures are re-encoded. A new thumbnail or trailer replaces the old one,
+        deleting it, which only a full-editing connection may do."""
         ticket = await call(lambda c: c.create_upload_ticket(post_id, role.capitalize(), caption))
         url = ticket["uploadUrl"]
         return UploadTicket(
@@ -314,6 +340,33 @@ def build_server(
         post = await call(lambda c: c.publish(post_id))
         return Post.from_api(post)
 
+    @server.tool(annotations=WRITE)
+    async def unpublish_post(post_id: PostId) -> Post:
+        """Takes a live post back to draft: it leaves the public portfolio and the job-fit
+        index, and can be published again later. Full-editing connections only."""
+        post = await call(lambda c: c.unpublish(post_id))
+        return Post.from_api(post)
+
+    @server.tool(annotations=DELETE)
+    async def delete_post(post_id: PostId, user_confirmed: Confirmed) -> Deleted:
+        """Deletes a post and every file attached to it, for good. Only when the user asked
+        for this post to be deleted. Full-editing connections only."""
+        _require_confirmation(user_confirmed, "deleted")
+        await call(lambda c: c.delete_post(post_id))
+        return Deleted(post_id=post_id)
+
+    @server.tool(annotations=DELETE)
+    async def delete_media(
+        post_id: PostId,
+        media_id: Annotated[int, Field(description="From list_media.")],
+        user_confirmed: Confirmed,
+    ) -> Deleted:
+        """Deletes one file from a post, for good. A live post must keep its thumbnail and
+        trailer; replace them with request_upload instead. Full-editing connections only."""
+        _require_confirmation(user_confirmed, "deleted")
+        await call(lambda c: c.delete_media(post_id, media_id))
+        return Deleted(post_id=post_id, media_id=media_id)
+
     return server
 
 
@@ -346,3 +399,39 @@ def build_app(settings: Settings) -> Starlette:
 
 def _clean(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value is not None}
+
+
+def _merged(
+    current: dict[str, Any],
+    title: str | None,
+    body: str | None,
+    summary: str | None,
+    slug: str | None,
+    repo_url: str | None,
+    demo_url: str | None,
+) -> dict[str, Any]:
+    """A full PUT body: the fields given, and the post's current values for the rest."""
+
+    def pick(given: str | None, key: str) -> Any:
+        return given if given is not None else current.get(key)
+
+    return _clean(
+        {
+            "title": pick(title, "title"),
+            "body": pick(body, "body"),
+            "summary": pick(summary, "summary"),
+            "slug": pick(slug, "slug"),
+            "repoUrl": pick(repo_url, "repoUrl"),
+            "demoUrl": pick(demo_url, "demoUrl"),
+            # Ignored by the API for an assistant; sent because the endpoint requires the field.
+            "isFeatured": current.get("isFeatured", False),
+        }
+    )
+
+
+def _require_confirmation(user_confirmed: bool, what: str) -> None:
+    if not user_confirmed:
+        raise ToolError(
+            f"Nothing was {what}. Ask the user to confirm, and call again with "
+            "user_confirmed=true only if they say yes."
+        )

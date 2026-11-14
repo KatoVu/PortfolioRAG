@@ -189,8 +189,9 @@ jobs:
         working-directory: mcp-server
         run: uv run ruff check . && uv run ruff format --check .
 
-      # Against a fake API: the tools, the token verifier, and the absence of any tool that
-      # deletes. The real end-to-end flow needs the API and a browser and runs locally.
+      # Against a fake API: the tools, the token verifier, and that every tool which deletes
+      # is marked destructive and needs the user's say-so. The real end-to-end flow needs the
+      # API and a browser and runs locally.
       - name: Test
         working-directory: mcp-server
         run: uv run pytest -q

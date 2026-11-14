@@ -11,6 +11,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 Status = Literal["draft", "published"]
+Mode = Literal["drafts_only", "full_editing"]
 
 
 def _status(item: dict[str, Any]) -> Status:
@@ -22,6 +23,12 @@ class Account(BaseModel):
     name: str | None
     handle: str | None
     email_confirmed: bool | None
+    mode: Mode = Field(
+        description=(
+            "drafts_only: write and publish drafts, never delete. full_editing: also edit live "
+            "posts, replace artwork, unpublish and delete. The user switches it in the studio."
+        )
+    )
 
     @classmethod
     def from_api(cls, me: dict[str, Any]) -> Account:
@@ -30,6 +37,7 @@ class Account(BaseModel):
             name=me.get("name"),
             handle=me.get("handle"),
             email_confirmed=me.get("isEmailConfirmed"),
+            mode="full_editing" if me.get("tokenScope") == "Editor" else "drafts_only",
         )
 
 
@@ -140,6 +148,12 @@ class Readiness(BaseModel):
     is_draft: bool | None
     ready: bool = Field(description="True when publish_post would succeed.")
     missing: list[str]
+
+
+class Deleted(BaseModel):
+    deleted: Literal[True] = True
+    post_id: int
+    media_id: int | None = None
 
 
 class UploadTicket(BaseModel):

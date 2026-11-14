@@ -19,13 +19,14 @@ async def call(server: Any, name: str, **arguments: Any) -> Any:
     return json.loads(text)
 
 
-async def test_there_is_no_tool_that_deletes_or_unpublishes(server):
-    names = [tool.name for tool in await server.list_tools()]
+async def test_every_tool_that_deletes_is_marked_and_needs_the_users_word(server):
+    tools = {tool.name: tool for tool in await server.list_tools()}
+    deleting = [name for name in tools if "delete" in name or "remove" in name]
 
-    assert names
-    assert not [
-        name for name in names if "delete" in name or "unpublish" in name or "remove" in name
-    ]
+    assert deleting == ["delete_post", "delete_media"]
+    for name in deleting:
+        assert tools[name].annotations.destructive_hint is True
+        assert "user_confirmed" in tools[name].input_schema["required"]
 
 
 async def test_reading_tools_are_marked_read_only(server):
@@ -136,3 +137,52 @@ async def test_every_tool_publishes_the_shape_of_its_answer(server):
     post = tools["get_post"].output_schema["properties"]
     assert post["status"]["enum"] == ["draft", "published"]
     assert "media" in post
+
+
+async def test_whoami_reports_the_connections_mode(server, fake_api: FakeApi, signed_in):
+    assert (await call(server, "whoami"))["mode"] == "drafts_only"
+
+    fake_api.scope = "Editor"
+    assert (await call(server, "whoami"))["mode"] == "full_editing"
+
+
+async def test_a_drafts_only_connection_is_refused_by_the_api_not_by_us(
+    server, fake_api: FakeApi, signed_in
+):
+    live = fake_api.add_post(is_draft=False)
+
+    with pytest.raises(ToolError, match="never delete"):
+        await call(server, "delete_post", post_id=live["id"], user_confirmed=True)
+
+    assert live["id"] in fake_api.posts
+
+
+async def test_full_editing_can_rewrite_unpublish_and_delete(server, fake_api: FakeApi, signed_in):
+    fake_api.scope = "Editor"
+    live = fake_api.add_post(is_draft=False, title="Kept title")
+    fake_api.media[live["id"]] = [{"id": 7, "role": "Attachment", "url": "/api/media/7/content"}]
+
+    rewritten = await call(server, "update_post", post_id=live["id"], body="rewritten")
+    assert rewritten["body"] == "rewritten"
+    assert rewritten["title"] == "Kept title"
+    assert rewritten["status"] == "published"
+
+    assert (await call(server, "unpublish_post", post_id=live["id"]))["status"] == "draft"
+
+    await call(server, "delete_media", post_id=live["id"], media_id=7, user_confirmed=True)
+    assert fake_api.media[live["id"]] == []
+
+    gone = await call(server, "delete_post", post_id=live["id"], user_confirmed=True)
+    assert gone == {"deleted": True, "post_id": live["id"], "media_id": None}
+    assert live["id"] not in fake_api.posts
+
+
+async def test_deleting_needs_the_users_explicit_confirmation(server, fake_api: FakeApi, signed_in):
+    fake_api.scope = "Editor"
+    post = fake_api.add_post()
+
+    with pytest.raises(ToolError, match="Ask the user"):
+        await call(server, "delete_post", post_id=post["id"], user_confirmed=False)
+
+    assert post["id"] in fake_api.posts
+    assert all(request.method != "DELETE" for request in fake_api.requests)

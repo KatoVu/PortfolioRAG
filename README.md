@@ -437,7 +437,7 @@ rag/             Python worker
   src/rag/       corpus, chunking, embeddings, indexing, retrieval, citations, scoring, pipeline
   eval/          fixture portfolio, golden set, metrics, judge, reports
   tests/         unit + integration
-mcp-server/      Remote MCP server: lets an AI assistant write drafts (OAuth, never deletes)
+mcp-server/      Remote MCP server: lets an AI assistant write posts (OAuth, drafts only or full editing)
 deploy/          Ansible, deploy/backup scripts, production runbook
 ```
 

@@ -26,6 +26,8 @@ class FakeApi:
         self.posts: dict[int, dict[str, Any]] = {}
         self.media: dict[int, list[dict[str, Any]]] = {}
         self.next_id = 1
+        # The connection's mode, as the API reports and enforces it: "Author" or "Editor".
+        self.scope = "Author"
 
     def add_post(self, *, is_draft: bool = True, **fields: Any) -> dict[str, Any]:
         post = {
@@ -56,7 +58,14 @@ class FakeApi:
 
         if path == "/api/auth/me":
             return httpx.Response(
-                200, json={"id": 1, "name": "Ada", "handle": "ada", "isEmailConfirmed": True}
+                200,
+                json={
+                    "id": 1,
+                    "name": "Ada",
+                    "handle": "ada",
+                    "isEmailConfirmed": True,
+                    "tokenScope": self.scope,
+                },
             )
 
         if path == "/api/admin/posts" and method == "GET":
@@ -79,11 +88,28 @@ class FakeApi:
             if len(parts) == 4 and method == "GET":
                 return httpx.Response(200, json=post)
 
+            full_editing = self.scope == "Editor"
+
             if len(parts) == 4 and method == "PUT":
-                if not post["isDraft"]:
+                if not post["isDraft"] and not full_editing:
                     return httpx.Response(403, json={"detail": "This token can only edit drafts."})
                 post.update(json.loads(request.content))
                 return httpx.Response(200, json=post)
+
+            if method == "DELETE" or parts[4:] == ["unpublish"]:
+                if not full_editing:
+                    return httpx.Response(
+                        403, json={"detail": "This API token can never delete anything."}
+                    )
+                if parts[4:] == ["unpublish"]:
+                    post["isDraft"] = True
+                    return httpx.Response(200, json=post)
+                if len(parts) == 4:
+                    del self.posts[post_id]
+                else:
+                    media_id = int(parts[5])
+                    self.media[post_id] = [m for m in self.media[post_id] if m["id"] != media_id]
+                return httpx.Response(204)
 
             if parts[4:] == ["publish"]:
                 post["isDraft"] = False
