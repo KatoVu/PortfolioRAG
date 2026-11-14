@@ -166,6 +166,36 @@ jobs:
         working-directory: rag
         run: uv run rag-eval --retrieval-only --container
 
+  mcp:
+    name: MCP server
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.blograg == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: mcp-server/uv.lock
+
+      - name: Install
+        working-directory: mcp-server
+        run: uv sync --locked
+
+      - name: Lint
+        working-directory: mcp-server
+        run: uv run ruff check . && uv run ruff format --check .
+
+      # Against a fake API: the tools, the token verifier, and that every tool which deletes
+      # is marked destructive and needs the user's say-so. The real end-to-end flow needs the
+      # API and a browser and runs locally.
+      - name: Test
+        working-directory: mcp-server
+        run: uv run pytest -q
+
   applier:
     name: Applier
     runs-on: ubuntu-latest

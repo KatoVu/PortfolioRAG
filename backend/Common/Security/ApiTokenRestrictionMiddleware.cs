@@ -36,6 +36,39 @@ public class ApiTokenRestrictionMiddleware
                 "this resource. Issue a token with the write scope instead.");
         }
 
+        if (currentUser.ApiTokenScope == ApiTokenScope.Author && !IsSafe(context.Request.Method))
+        {
+            // NOTE: an allowlist, not a denylist. A new writing route stays closed to an
+            // assistant until it is marked, and no mark can open a DELETE.
+            if (HttpMethods.IsDelete(context.Request.Method))
+            {
+                throw new ForbiddenException(
+                    "This API token can never delete anything. Remove it from the studio instead.");
+            }
+
+            if (context.GetEndpoint()?.Metadata.GetMetadata<AllowAuthorScopeAttribute>() is null)
+            {
+                throw new ForbiddenException(
+                    "This API token can only write post drafts and their media. Make this change " +
+                    "from the studio instead.");
+            }
+        }
+
+        if (currentUser.ApiTokenScope == ApiTokenScope.Editor && !IsSafe(context.Request.Method))
+        {
+            var metadata = context.GetEndpoint()?.Metadata;
+
+            // NOTE: the same allowlist. Full editing widens what an assistant may do to a post,
+            // never what else of the account it may touch.
+            if (metadata?.GetMetadata<AllowAuthorScopeAttribute>() is null &&
+                metadata?.GetMetadata<AllowEditorScopeAttribute>() is null)
+            {
+                throw new ForbiddenException(
+                    "This API token can only change posts and their media. Make this change " +
+                    "from the studio instead.");
+            }
+        }
+
         return _next(context);
     }
 

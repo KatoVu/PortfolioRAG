@@ -21,6 +21,21 @@ public interface IMediaService
         MediaRole role = MediaRole.Attachment,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The same, for a caller that has already established who is acting — an upload ticket,
+    /// which arrives with no credential of its own. <paramref name="authorScoped"/> applies
+    /// the limits of an <see cref="ApiTokenScope.Author"/> token: drafts only, and never over
+    /// an existing thumbnail or trailer.
+    /// </summary>
+    Task<MediaDto> AttachAsync(
+        int authorId,
+        int postId,
+        IFormFile file,
+        MediaRole role,
+        string? caption,
+        bool authorScoped,
+        CancellationToken cancellationToken = default);
+
     /// <summary>The media on one of the caller's own posts, draft or not.</summary>
     Task<IReadOnlyList<MediaDto>> GetForPostAsync(int postId, CancellationToken cancellationToken = default);
 

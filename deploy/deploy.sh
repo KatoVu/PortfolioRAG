@@ -65,7 +65,7 @@ probe() {
 
 healthy() {
     for _ in $(seq 1 30); do
-        if probe "api.${site_domain}" /healthz && probe "$site_domain" /; then
+        if probe "api.${site_domain}" /healthz && probe "mcp.${site_domain}" /healthz && probe "$site_domain" /; then
             return 0
         fi
         sleep 2
@@ -76,7 +76,7 @@ healthy() {
 # Just remove the current image and ran the one beforehand instead
 rollback() {
     echo "!! Release ${new_tag} failed"
-    "${compose[@]}" logs --tail 80 migrate api frontend rag || true
+    "${compose[@]}" logs --tail 80 migrate api frontend rag mcp || true
 
     if [[ -z "$previous_tag" || "$previous_tag" == "$new_tag" ]]; then
         echo "!! No previous release to roll back to"
@@ -85,7 +85,19 @@ rollback() {
 
     echo "==> Rolling back to ${previous_tag}"
     sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${previous_tag}/" .env
-    "${compose[@]}" up -d --remove-orphans
+
+    # The workflow has already overwritten docker-compose.prod.yml with the new release's,
+    # which may name services the old tag never had an image for. Use the file that last
+    # went live with it; --remove-orphans then drops whatever the failed release added.
+    if [[ -f .current-compose.yml ]]; then
+        docker compose -f .current-compose.yml up -d --remove-orphans
+    elif docker image inspect "$(env_value IMAGE_PREFIX)/portfolio-mcp:${previous_tag}" >/dev/null 2>&1; then
+        "${compose[@]}" up -d --remove-orphans
+    else
+        # No saved file, and the old release predates the MCP server: bring back the rest.
+        "${compose[@]}" rm --stop --force mcp || true
+        "${compose[@]}" up -d --remove-orphans db migrate api frontend rag
+    fi
     exit 1
 }
 
@@ -93,6 +105,7 @@ rollback() {
 healthy || rollback
 
 echo "$new_tag" > .current-tag
+cp docker-compose.prod.yml .current-compose.yml
 
 # Only this stack's images (labelled at build time) and only ones no container uses, so
 # the other sites' images are never touched.

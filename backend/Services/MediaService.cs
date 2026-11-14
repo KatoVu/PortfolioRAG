@@ -6,7 +6,9 @@ using Backend.Mapping;
 using Backend.Models.DTOs;
 using Backend.Models.Entities;
 using Backend.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Backend.Services;
 
@@ -50,19 +52,37 @@ public class MediaService : IMediaService
         _logger = logger;
     }
 
-    public async Task<MediaDto> AddToPostAsync(
+    public Task<MediaDto> AddToPostAsync(
         int postId,
         IFormFile file,
         MediaRole role = MediaRole.Attachment,
+        CancellationToken cancellationToken = default) =>
+        AttachAsync(
+            _currentUser.RequireAuthorId(),
+            postId,
+            file,
+            role,
+            caption: null,
+            authorScoped: _currentUser.ApiTokenScope == ApiTokenScope.Author,
+            cancellationToken);
+
+    public async Task<MediaDto> AttachAsync(
+        int authorId,
+        int postId,
+        IFormFile file,
+        MediaRole role,
+        string? caption,
+        bool authorScoped,
         CancellationToken cancellationToken = default)
     {
-        var authorId = _currentUser.RequireAuthorId();
-
         var post = await _posts.GetByIdAsync(postId, tracked: false, cancellationToken)
             ?? throw NotFoundException.For("Post", postId);
 
         if (post.AuthorId != authorId)
             throw ForbiddenException.For("post", postId);
+
+        if (authorScoped)
+            await EnsureAuthorScopeMayAttachAsync(post, role, cancellationToken);
 
         // NOTE: a thumbnail is drawn as a still in a card and nothing ever plays it, so a
         // video in that slot would render as a dead frame. A trailer takes either — a
@@ -91,6 +111,7 @@ public class MediaService : IMediaService
             ByteSize = stored.ByteSize,
             Extension = upload.Extension,
             Role = role,
+            Caption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim(),
             PostId = postId,
             CreatedAt = _timeProvider.GetUtcNow()
         };
@@ -98,7 +119,9 @@ public class MediaService : IMediaService
         // A post leads with one thumbnail and one trailer, so uploading either replaces
         // what was there. Removed in the same transaction as the insert: a unique index
         // holds the rule, and leaving both rows in place for even a moment would trip it.
-        var replaced = role == MediaRole.Attachment
+        // An assistant never replaces: its check above can go stale while the file uploads,
+        // so it skips the lookup and lets that same index refuse a thumbnail that raced in.
+        var replaced = role == MediaRole.Attachment || authorScoped
             ? null
             : (await _medias.GetByPostIdAsync(postId, cancellationToken))
                 .FirstOrDefault(item => item.Role == role);
@@ -110,6 +133,12 @@ public class MediaService : IMediaService
 
             await _medias.AddAsync(media, cancellationToken);
             await _medias.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            authorScoped && exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            await TryDeleteObjectAsync(stored.ObjectKey, cancellationToken);
+            throw CannotReplace(role);
         }
         catch
         {
@@ -179,6 +208,12 @@ public class MediaService : IMediaService
     {
         var media = await LoadOwnedAsync(postId, mediaId, cancellationToken);
 
+        if (_currentUser.ApiTokenScope == ApiTokenScope.Author && !media.Post.IsDraft)
+        {
+            throw new ForbiddenException(
+                "This token can only change media on a draft, and this post is published.");
+        }
+
         media.Caption = string.IsNullOrWhiteSpace(dto.Caption) ? null : dto.Caption.Trim();
 
         await _medias.SaveChangesAsync(cancellationToken);
@@ -206,6 +241,34 @@ public class MediaService : IMediaService
         _medias.Remove(media);
         await _medias.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// What an assistant may attach: anything to a draft, but never over an existing
+    /// thumbnail or trailer — attaching one replaces the old file, and replacing deletes it.
+    /// </summary>
+    private async Task EnsureAuthorScopeMayAttachAsync(
+        Post post,
+        MediaRole role,
+        CancellationToken cancellationToken)
+    {
+        if (!post.IsDraft)
+        {
+            throw new ForbiddenException(
+                "This token can only add media to a draft, and this post is published.");
+        }
+
+        if (role == MediaRole.Attachment)
+            return;
+
+        var existing = await _medias.GetByPostIdAsync(post.Id, cancellationToken);
+
+        if (existing.Any(item => item.Role == role))
+            throw CannotReplace(role);
+    }
+
+    private static ConflictException CannotReplace(MediaRole role) =>
+        new($"This post already has a {role.ToString().ToLowerInvariant()}, and this token cannot " +
+            "replace it because that would delete the old file. Remove it from the studio first.");
 
     /// <summary>
     /// The author's view of an upload, with a link the editor can draw without a round trip

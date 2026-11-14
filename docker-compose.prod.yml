@@ -46,6 +46,11 @@ x-api-environment: &api-environment
   Cors__AllowedOrigins__0: "*"
   Analytics__VisitorSalt: ${ANALYTICS_VISITOR_SALT:?}
   Analytics__SelfHosts__0: ${SITE_DOMAIN:?}
+  # The authorization server the MCP connector signs in through. The consent page lives
+  # in the studio; tokens are only ever minted for the MCP server below.
+  OAuth__Issuer: https://api.${SITE_DOMAIN:?}
+  OAuth__ConsentUrl: https://${SITE_DOMAIN:?}/oauth/consent
+  OAuth__AllowedResources__0: https://mcp.${SITE_DOMAIN:?}
 
 services:
   db:
@@ -81,7 +86,12 @@ services:
     image: ${IMAGE_PREFIX:?}/portfolio-api:${IMAGE_TAG:?}
     restart: unless-stopped
     environment: *api-environment
-    networks: [default, traefik]
+    networks:
+      default:
+        # A name no other site on the shared traefik network uses, so the MCP server's lookup
+        # cannot land on another stack's `api` and hand it an author's bearer token.
+        aliases: [portfolio-api]
+      traefik: {}
     labels:
       traefik.enable: "true"
       traefik.http.routers.portfolio-api.rule: Host(`api.${SITE_DOMAIN:?}`)
@@ -101,6 +111,28 @@ services:
       traefik.http.routers.portfolio-frontend.rule: Host(`${SITE_DOMAIN:?}`)
       traefik.http.routers.portfolio-frontend.entrypoints: websecure
       traefik.http.services.portfolio-frontend.loadbalancer.server.port: "3000"
+    depends_on:
+      - api
+    logging: *logging
+
+  # The remote MCP server an AI assistant connects to. Stateless; scale freely. Talks to
+  # the API over the compose network, and every rule it is held to is the API's.
+  mcp:
+    image: ${IMAGE_PREFIX:?}/portfolio-mcp:${IMAGE_TAG:?}
+    restart: unless-stopped
+    environment:
+      # Plain HTTP on purpose: this hop never leaves the host's private compose network.
+      BLOGRAG_MCP_API_URL: http://portfolio-api:8080
+      # Must match the API's OAuth__Issuer to the character.
+      BLOGRAG_MCP_PUBLIC_API_URL: https://api.${SITE_DOMAIN:?}
+      BLOGRAG_MCP_PUBLIC_URL: https://mcp.${SITE_DOMAIN:?}/mcp
+      BLOGRAG_MCP_LOG_LEVEL: ${MCP_LOG_LEVEL:-INFO}
+    networks: [default, traefik]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.portfolio-mcp.rule: Host(`mcp.${SITE_DOMAIN:?}`)
+      traefik.http.routers.portfolio-mcp.entrypoints: websecure
+      traefik.http.services.portfolio-mcp.loadbalancer.server.port: "8000"
     depends_on:
       - api
     logging: *logging

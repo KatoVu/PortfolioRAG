@@ -228,7 +228,10 @@ public class AuthService : IAuthService
         var author = await _authors.GetByIdAsync(authorId, tracked: false, cancellationToken)
             ?? throw new UnauthorizedException("The signed-in account no longer exists.");
 
-        return await BuildProfileAsync(author, cancellationToken);
+        var logins = await _authors.GetExternalLoginsAsync(author.Id, cancellationToken);
+        return author.ToProfileDto(
+            logins.Select(l => l.Provider).Distinct().ToList(),
+            _currentUser.ApiTokenScope);
     }
 
     public async Task<AuthResultDto> SetPasswordAsync(
@@ -276,6 +279,11 @@ public class AuthService : IAuthService
         CreateApiTokenDto dto,
         CancellationToken cancellationToken = default)
     {
+        // NOTE: Editor is only ever minted by an OAuth grant the author can switch off, and an
+        // undefined value would slip past every rule in ApiTokenRestrictionMiddleware.
+        if (dto.Scope is not (ApiTokenScope.Read or ApiTokenScope.Write or ApiTokenScope.Author))
+            throw new ValidationException("Choose a read, read + write, or drafts-only scope.");
+
         var authorId = _currentUser.RequireAuthorId();
         var now = _timeProvider.GetUtcNow();
         var name = dto.Name.Trim();

@@ -67,6 +67,8 @@ builder.Services.AddScoped<IEmailVerificationRepository, EmailVerificationReposi
 builder.Services.AddScoped<IMediaRepository, MediaRepository>();
 builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
 builder.Services.AddScoped<IRagRepository, RagRepository>();
+builder.Services.AddScoped<IOAuthRepository, OAuthRepository>();
+builder.Services.AddScoped<IUploadTicketRepository, UploadTicketRepository>();
 
 builder.Services.AddScoped<IAuthorService, AuthorService>();
 builder.Services.AddScoped<IPostService, PostService>();
@@ -78,6 +80,8 @@ builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddScoped<ILlmCredentialService, LlmCredentialService>();
 builder.Services.AddScoped<IJobFitService, JobFitService>();
 builder.Services.AddScoped<IRagIndexScheduler, RagIndexScheduler>();
+builder.Services.AddScoped<IOAuthService, OAuthService>();
+builder.Services.AddScoped<IUploadTicketService, UploadTicketService>();
 
 // NOTE: the visitor salt is too insignificant so ill leave it as optional for now
 var analyticsOptions = builder.Configuration
@@ -190,7 +194,7 @@ switch (storageOptions.Provider)
 
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = mediaOptions.MaxUploadBytes + RequestOverheadBytes;
+    options.MultipartBodyLengthLimit = mediaOptions.MaxUploadRequestBytes;
 });
 
 var llmOptions = builder.Configuration
@@ -298,6 +302,10 @@ if (noCheck && (string.IsNullOrWhiteSpace(jwtOptions.Key) || jwtOptions.Key.Leng
 }
 
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
+
+// NOTE: optional, like Google. With no issuer the OAuth endpoints answer 503 and the MCP
+// connector cannot sign in; nothing else depends on it.
+builder.Services.Configure<OAuthOptions>(builder.Configuration.GetSection(OAuthOptions.SectionName));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
@@ -506,9 +514,4 @@ app.Run();
 // NOTE: exposed so the integration tests can spin the real pipeline up with WebApplicationFactory.
 public partial class Program
 {
-    /// <summary>
-    /// Slack over the configured file size for the multipart envelope itself — boundaries,
-    /// headers and the other fields of the form.
-    /// </summary>
-    private const long RequestOverheadBytes = 1024 * 1024;
 }

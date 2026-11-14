@@ -39,6 +39,12 @@ public class MediaOptions
     /// <summary>The largest body either upload endpoint could legitimately carry.</summary>
     public long MaxUploadBytes => Math.Max(MaxImageBytes, MaxVideoBytes);
 
+    /// <summary>
+    /// The whole upload request: the file plus slack for the multipart envelope itself —
+    /// boundaries, headers and the other fields of the form.
+    /// </summary>
+    public long MaxUploadRequestBytes => MaxUploadBytes + 1024 * 1024;
+
     public void Validate()
     {
         if (MaxImageBytes <= 0 || MaxVideoBytes <= 0 || MaxImagePixels <= 0)

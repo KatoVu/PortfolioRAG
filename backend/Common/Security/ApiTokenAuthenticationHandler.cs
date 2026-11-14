@@ -45,7 +45,9 @@ public class ApiTokenAuthenticationHandler : AuthenticationHandler<Authenticatio
 
         var now = _timeProvider.GetUtcNow();
 
-        if (!stored.IsActive(now))
+        // NOTE: the grant too, not just the token. A refresh racing a disconnect can save a
+        // fresh token after the bulk revoke already ran, and that token must die with the grant.
+        if (!stored.IsActive(now) || stored.OAuthGrant?.RevokedAt is not null)
         {
             Logger.LogInformation(
                 "Rejected an inactive API token {TokenId} for author {AuthorId}.",
@@ -100,7 +102,9 @@ public class ApiTokenAuthenticationHandler : AuthenticationHandler<Authenticatio
         new Claim(JwtRegisteredClaimNames.Name, token.Author.Name),
         new Claim(AuthClaims.AuthMethod, AuthMethods.ApiToken),
         new Claim(AuthClaims.EmailVerified, token.Author.EmailConfirmedAt is not null ? "true" : "false"),
-        new Claim(AuthClaims.ApiTokenScope, token.Scope.ToString()),
+        // NOTE: a token an OAuth grant minted takes the grant's current mode, which the author
+        // can switch at any time; see OAuthGrant.TokenScope.
+        new Claim(AuthClaims.ApiTokenScope, (token.OAuthGrant?.TokenScope ?? token.Scope).ToString()),
         new Claim(AuthClaims.ApiTokenId, token.Id.ToString(CultureInfo.InvariantCulture))
     ];
 

@@ -15,6 +15,11 @@
 
 import * as runtime from '../runtime';
 import {
+    type CreateUploadTicketDto,
+    CreateUploadTicketDtoFromJSON,
+    CreateUploadTicketDtoToJSON,
+} from '../models/CreateUploadTicketDto';
+import {
     type MediaDto,
     MediaDtoFromJSON,
     MediaDtoToJSON,
@@ -34,6 +39,22 @@ import {
     UpdateMediaDtoFromJSON,
     UpdateMediaDtoToJSON,
 } from '../models/UpdateMediaDto';
+import {
+    type UploadTicketDto,
+    UploadTicketDtoFromJSON,
+    UploadTicketDtoToJSON,
+} from '../models/UploadTicketDto';
+
+export interface PostMediaCreateUploadTicketRequest {
+    /**
+     * 
+     */
+    postId: number;
+    /**
+     * 
+     */
+    createUploadTicketDto: CreateUploadTicketDto;
+}
 
 export interface PostMediaDeleteRequest {
     /**
@@ -87,6 +108,67 @@ export interface PostMediaUploadRequest {
  * 
  */
 export class PostMediaApi extends runtime.BaseAPI {
+
+    /**
+     * Creates request options for postMediaCreateUploadTicket without sending the request
+     */
+    async postMediaCreateUploadTicketRequestOpts(requestParameters: PostMediaCreateUploadTicketRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['postId'] == null) {
+            throw new runtime.RequiredError(
+                'postId',
+                'Required parameter "postId" was null or undefined when calling postMediaCreateUploadTicket().'
+            );
+        }
+
+        if (requestParameters['createUploadTicketDto'] == null) {
+            throw new runtime.RequiredError(
+                'createUploadTicketDto',
+                'Required parameter "createUploadTicketDto" was null or undefined when calling postMediaCreateUploadTicket().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("Bearer", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/api/admin/posts/{postId}/media/upload-tickets`;
+        urlPath = urlPath.replace('{postId}', encodeURIComponent(String(requestParameters['postId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateUploadTicketDtoToJSON(requestParameters['createUploadTicketDto']),
+        };
+    }
+
+    /**
+     */
+    async postMediaCreateUploadTicketRaw(requestParameters: PostMediaCreateUploadTicketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadTicketDto>> {
+        const requestOptions = await this.postMediaCreateUploadTicketRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UploadTicketDtoFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async postMediaCreateUploadTicket(requestParameters: PostMediaCreateUploadTicketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadTicketDto> {
+        const response = await this.postMediaCreateUploadTicketRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Creates request options for postMediaDelete without sending the request

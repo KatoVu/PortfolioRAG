@@ -10,6 +10,7 @@ import {
   ExperiencesApi,
   FetchError,
   LlmApi,
+  OAuthConsentApi,
   PostMediaApi,
   ResponseError,
 } from "@/lib/api/generated";
@@ -42,6 +43,10 @@ export const contactChannelsApi = new ContactChannelsApi(configuration);
 // The provider key and everything around it. Signed, and refused to an API token however
 // wide its scope — see SessionOnlyAttribute on the API.
 export const llmApi = new LlmApi(configuration);
+
+// Approving an app, and the list of connected ones. Session only on the API, for the same
+// reason: an app must not be able to approve itself or disconnect the others.
+export const oauthConsentApi = new OAuthConsentApi(configuration);
 export const authApi = new AuthApi(new Configuration({ basePath: API_BASE_URL }));
 
 /*

@@ -11,5 +11,7 @@ export * from './ExperiencesApi';
 export * from './JobFitApi';
 export * from './LlmApi';
 export * from './MediaApi';
+export * from './OAuthConsentApi';
 export * from './PostMediaApi';
 export * from './PostsApi';
+export * from './UploadsApi';

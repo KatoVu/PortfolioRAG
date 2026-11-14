@@ -23,6 +23,16 @@ public class BlogDbContext : DbContext
 
     public DbSet<ApiToken> ApiTokens => Set<ApiToken>();
 
+    public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
+
+    public DbSet<OAuthAuthorizationCode> OAuthAuthorizationCodes => Set<OAuthAuthorizationCode>();
+
+    public DbSet<OAuthGrant> OAuthGrants => Set<OAuthGrant>();
+
+    public DbSet<OAuthRefreshToken> OAuthRefreshTokens => Set<OAuthRefreshToken>();
+
+    public DbSet<UploadTicket> UploadTickets => Set<UploadTicket>();
+
     public DbSet<EmailVerificationCode> EmailVerificationCodes => Set<EmailVerificationCode>();
 
     public DbSet<PageView> PageViews => Set<PageView>();
@@ -104,6 +114,90 @@ public class BlogDbContext : DbContext
 
             entity.HasOne(t => t.Author)
                 .WithMany(a => a.ApiTokens)
+                .HasForeignKey(t => t.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(t => t.OAuthGrant)
+                .WithMany(g => g.AccessTokens)
+                .HasForeignKey(t => t.OAuthGrantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OAuthClient>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.ClientId).IsRequired().HasMaxLength(64);
+            entity.Property(c => c.ClientName).IsRequired().HasMaxLength(100);
+            entity.HasIndex(c => c.ClientId).IsUnique();
+        });
+
+        modelBuilder.Entity<OAuthAuthorizationCode>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.CodeHash).IsRequired().HasMaxLength(128);
+            entity.Property(c => c.RedirectUri).IsRequired().HasMaxLength(500);
+            entity.Property(c => c.CodeChallenge).IsRequired().HasMaxLength(128);
+            entity.Property(c => c.Scope).IsRequired().HasMaxLength(200);
+            entity.Property(c => c.Resource).HasMaxLength(500);
+            entity.HasIndex(c => c.CodeHash).IsUnique();
+
+            entity.HasOne(c => c.Client)
+                .WithMany()
+                .HasForeignKey(c => c.OAuthClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<Author>()
+                .WithMany()
+                .HasForeignKey(c => c.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OAuthGrant>(entity =>
+        {
+            entity.HasKey(g => g.Id);
+            entity.Property(g => g.Scope).IsRequired().HasMaxLength(200);
+            entity.Property(g => g.Resource).HasMaxLength(500);
+
+            // The studio's connected-apps list.
+            entity.HasIndex(g => new { g.AuthorId, g.CreatedAt });
+
+            entity.HasOne(g => g.Author)
+                .WithMany()
+                .HasForeignKey(g => g.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(g => g.Client)
+                .WithMany()
+                .HasForeignKey(g => g.OAuthClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OAuthRefreshToken>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.TokenHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+
+            entity.HasOne(t => t.Grant)
+                .WithMany(g => g.RefreshTokens)
+                .HasForeignKey(t => t.OAuthGrantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UploadTicket>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(t => t.Caption).HasMaxLength(200);
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+
+            entity.HasOne(t => t.Post)
+                .WithMany()
+                .HasForeignKey(t => t.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<Author>()
+                .WithMany()
                 .HasForeignKey(t => t.AuthorId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

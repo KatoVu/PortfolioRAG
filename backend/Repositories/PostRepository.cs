@@ -2,6 +2,7 @@ using Backend.Data;
 using Backend.Models.Entities;
 using Backend.Models.Requests;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Backend.Repositories;
 
@@ -89,6 +90,14 @@ public class PostRepository : IPostRepository
         _context.Posts.Remove(post);
         return Task.CompletedTask;
     }
+
+    public async Task<bool> TryLockDraftAsync(int id, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        await _context.Posts
+            .Where(p => p.Id == id && p.IsDraft)
+            .ExecuteUpdateAsync(set => set.SetProperty(p => p.UpdatedAt, now), cancellationToken) == 1;
+
+    public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        _context.Database.BeginTransactionAsync(cancellationToken);
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _context.SaveChangesAsync(cancellationToken);

@@ -8,8 +8,10 @@ apis/ExperiencesApi.ts
 apis/JobFitApi.ts
 apis/LlmApi.ts
 apis/MediaApi.ts
+apis/OAuthConsentApi.ts
 apis/PostMediaApi.ts
 apis/PostsApi.ts
+apis/UploadsApi.ts
 apis/index.ts
 docs/AdminAnalyticsApi.md
 docs/AdminPostsApi.md
@@ -23,8 +25,12 @@ docs/AuthProfileDto.md
 docs/AuthResultDto.md
 docs/AuthorDto.md
 docs/AuthorSummaryDto.md
+docs/AuthorizeRequestDto.md
 docs/AuthorsApi.md
 docs/ConfirmEmailDto.md
+docs/ConsentDecisionDto.md
+docs/ConsentDescriptionDto.md
+docs/ConsentResultDto.md
 docs/ContactChannelDto.md
 docs/ContactChannelInputDto.md
 docs/ContactChannelsApi.md
@@ -33,6 +39,7 @@ docs/CoverLetterRequestDto.md
 docs/CoverLetterSourceDto.md
 docs/CreateApiTokenDto.md
 docs/CreatePostDto.md
+docs/CreateUploadTicketDto.md
 docs/DailyTrafficDto.md
 docs/EmailVerificationChallengeDto.md
 docs/EvidenceDto.md
@@ -41,6 +48,7 @@ docs/ExperienceInputDto.md
 docs/ExperiencesApi.md
 docs/ExternalLoginProvider.md
 docs/GoogleSignInDto.md
+docs/GrantModeDto.md
 docs/JobFitApi.md
 docs/JobFitAvailabilityDto.md
 docs/JobFitReportDto.md
@@ -56,6 +64,8 @@ docs/MediaDto.md
 docs/MediaExtension.md
 docs/MediaRole.md
 docs/MetricDto.md
+docs/OAuthConsentApi.md
+docs/OAuthGrantDto.md
 docs/PagedResultOfPostSummaryDto.md
 docs/PostDto.md
 docs/PostMediaApi.md
@@ -87,6 +97,8 @@ docs/UpdateAuthorDto.md
 docs/UpdateLlmSettingsDto.md
 docs/UpdateMediaDto.md
 docs/UpdatePostDto.md
+docs/UploadTicketDto.md
+docs/UploadsApi.md
 docs/UsageDto.md
 index.ts
 models/AnalyticsSummaryDto.ts
@@ -97,7 +109,11 @@ models/AuthProfileDto.ts
 models/AuthResultDto.ts
 models/AuthorDto.ts
 models/AuthorSummaryDto.ts
+models/AuthorizeRequestDto.ts
 models/ConfirmEmailDto.ts
+models/ConsentDecisionDto.ts
+models/ConsentDescriptionDto.ts
+models/ConsentResultDto.ts
 models/ContactChannelDto.ts
 models/ContactChannelInputDto.ts
 models/CoverLetterDto.ts
@@ -105,6 +121,7 @@ models/CoverLetterRequestDto.ts
 models/CoverLetterSourceDto.ts
 models/CreateApiTokenDto.ts
 models/CreatePostDto.ts
+models/CreateUploadTicketDto.ts
 models/DailyTrafficDto.ts
 models/EmailVerificationChallengeDto.ts
 models/EvidenceDto.ts
@@ -112,6 +129,7 @@ models/ExperienceDto.ts
 models/ExperienceInputDto.ts
 models/ExternalLoginProvider.ts
 models/GoogleSignInDto.ts
+models/GrantModeDto.ts
 models/JobFitAvailabilityDto.ts
 models/JobFitReportDto.ts
 models/JobFitRequestDto.ts
@@ -124,6 +142,7 @@ models/MediaDto.ts
 models/MediaExtension.ts
 models/MediaRole.ts
 models/MetricDto.ts
+models/OAuthGrantDto.ts
 models/PagedResultOfPostSummaryDto.ts
 models/PostDto.ts
 models/PostSortOrder.ts
@@ -153,6 +172,7 @@ models/UpdateAuthorDto.ts
 models/UpdateLlmSettingsDto.ts
 models/UpdateMediaDto.ts
 models/UpdatePostDto.ts
+models/UploadTicketDto.ts
 models/UsageDto.ts
 models/index.ts
 runtime.ts

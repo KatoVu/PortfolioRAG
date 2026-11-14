@@ -74,7 +74,9 @@ export function IssueTokenForm({
         hint={
           draft.scope === ApiTokenScope.Write
             ? "Can create, edit, publish and delete."
-            : "Can only read. Safe for a dashboard."
+            : draft.scope === ApiTokenScope.Author
+              ? "Can read, write drafts and publish them. Never deletes. For AI assistants."
+              : "Can only read. Safe for a dashboard."
         }
         className="lg:row-span-3 lg:grid lg:grid-rows-subgrid lg:gap-y-1.5"
       >
@@ -88,6 +90,7 @@ export function IssueTokenForm({
           className="rounded border border-warm-border bg-warm-sunken px-3 py-2 text-[13.5px] text-warm-black transition-colors focus:border-warm-black focus:bg-warm-surface focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value={ApiTokenScope.Write}>Read + write</option>
+          <option value={ApiTokenScope.Author}>Drafts only</option>
           <option value={ApiTokenScope.Read}>Read only</option>
         </select>
       </Field>

@@ -1,14 +1,14 @@
 # Deploying to the VPS
 
 ```
-push to main ─► CI suite ─► build api/frontend/rag ─► GHCR ─► ssh deploy@vps deploy.sh
-                                                               │
-                        pull ─► pg_dump ─► migrate ─► up -d ─► /healthz ok? ─┬─ yes: done
-                                                                             └─ no: previous tag back up, run fails
+push to main ─► CI suite ─► build api/frontend/rag/mcp ─► GHCR ─► ssh deploy@vps deploy.sh
+                                                                   │
+                            pull ─► pg_dump ─► migrate ─► up -d ─► /healthz ok? ─┬─ yes: done
+                                                                                 └─ no: previous tag back up, run fails
 ```
 
 - **`docker-compose.prod.yml`** (repo root) — the whole stack: Postgres/pgvector, a one-shot
-  `migrate`, the API, the frontend, the rag worker. Publishes no ports; the API and frontend
+  `migrate`, the API, the frontend, the rag worker, the MCP server. Publishes no ports; the API, frontend and MCP server
   join the external `traefik` network and route themselves with labels. The host's Traefik is
   the public entry point, shared with the other sites on the box.
 - **`ansible/`** — one-time (and re-runnable) server setup: Docker, the `deploy` user,
@@ -19,7 +19,7 @@ push to main ─► CI suite ─► build api/frontend/rag ─► GHCR ─► ss
 
 ## First-time setup
 
-1. **DNS**: point `example.com` and `api.example.com` at the VPS.
+1. **DNS**: point `example.com`, `api.example.com` and `mcp.example.com` at the VPS.
 2. **Deploy key**: `ssh-keygen -t ed25519 -f ~/.ssh/portfolio-deploy -C portfolio-deploy`
 3. **Provision**:
    ```sh

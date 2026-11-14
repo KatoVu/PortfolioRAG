@@ -1,4 +1,7 @@
+using Backend.Common;
+using Backend.Common.Security;
 using Backend.Models.DTOs;
+using Backend.Models.DTOs.OAuth;
 using Backend.Models.Entities;
 using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -18,10 +21,12 @@ namespace Backend.Controllers;
 public class PostMediaController : ControllerBase
 {
     private readonly IMediaService _mediaService;
+    private readonly IUploadTicketService _uploadTickets;
 
-    public PostMediaController(IMediaService mediaService)
+    public PostMediaController(IMediaService mediaService, IUploadTicketService uploadTickets)
     {
         _mediaService = mediaService;
+        _uploadTickets = uploadTickets;
     }
 
     [HttpGet]
@@ -45,10 +50,10 @@ public class PostMediaController : ControllerBase
     /// <c>Thumbnail</c> is a supported image file
     /// <c>Trailer</c> is either a image or video format file
     /// </param>
+    [AllowAuthorScope]
     [HttpPost]
     [Consumes("multipart/form-data")]
-    // NOTE: disable body limit as new limiter is bounded by FormOptions.MultipartBodyLengthLimit
-    [DisableRequestSizeLimit]
+    [UploadSizeLimit]
     [ProducesResponseType(typeof(MediaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -71,7 +76,30 @@ public class PostMediaController : ControllerBase
             media);
     }
 
+    /// <summary>
+    /// Issues a one-time link that uploads one file to this post, in the given role and with
+    /// the given caption. For callers that cannot send the file through this request — an
+    /// assistant whose MCP server is on another machine. POST the file to the link as
+    /// multipart field <c>file</c> within its expiry.
+    /// </summary>
+    [AllowAuthorScope]
+    [HttpPost("upload-tickets")]
+    [ProducesResponseType(typeof(UploadTicketDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<UploadTicketDto>> CreateUploadTicket(
+        int postId,
+        [FromBody] CreateUploadTicketDto dto,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await _uploadTickets.CreateAsync(postId, dto, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, ticket);
+    }
+
     // Update the file metadata, not the actual file itself
+    [AllowAuthorScope]
     [HttpPut("{mediaId:int}")]
     [ProducesResponseType(typeof(MediaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -85,6 +113,7 @@ public class PostMediaController : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await _mediaService.UpdateAsync(postId, mediaId, dto, cancellationToken));
 
+    [AllowEditorScope]
     [HttpDelete("{mediaId:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

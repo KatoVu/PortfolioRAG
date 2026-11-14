@@ -38,6 +38,8 @@ public class DefaultExceptionHandler : IExceptionHandler
             TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Too many requests"),
             PayloadTooLargeException => (StatusCodes.Status413PayloadTooLarge, "Upload too large"),
             InvalidDataException => (StatusCodes.Status413PayloadTooLarge, "Upload too large"),
+            // Kestrel, when a body runs past MaxRequestBodySize (see UploadSizeLimitAttribute)
+            BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge } => (StatusCodes.Status413PayloadTooLarge, "Upload too large"),
             UnsupportedMediaTypeException => (StatusCodes.Status415UnsupportedMediaType, "Unsupported file type"),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occured")
         };

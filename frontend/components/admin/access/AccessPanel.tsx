@@ -4,6 +4,7 @@ import { useApiTokens } from "@/lib/admin/useApiTokens";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Panel, PanelHeader } from "../ui/Panel";
+import { ConnectedApps } from "./ConnectedApps";
 import { IssueTokenForm } from "./IssueTokenForm";
 import { SecretReveal } from "./SecretReveal";
 import { TokenRow } from "./TokenRow";
@@ -99,6 +100,8 @@ export function AccessPanel() {
         <IssueTokenForm busy={tokens.busy === "issuing"} onCreateAction={tokens.create} />
       </Panel>
 
+      <ConnectedApps />
+
       <Panel className="flex flex-col gap-3 p-5 sm:p-6">
         <PanelHeader
           icon="verified"
@@ -117,8 +120,9 @@ export function AccessPanel() {
         </ul>
 
         <p className="border-t border-warm-border/60 pt-3 text-xs leading-relaxed text-warm-slate">
-          A read-only token is refused anything but GET. Everything else a signed-in session
-          can do, a read + write token can do.
+          A read-only token is refused anything but GET. A drafts-only token can also write
+          drafts and publish them, but never delete, unpublish or edit a live post. Everything
+          else a signed-in session can do, a read + write token can do.
         </p>
       </Panel>
     </section>

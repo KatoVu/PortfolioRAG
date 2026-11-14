@@ -21,6 +21,13 @@ import {
     ExternalLoginProviderToJSON,
     ExternalLoginProviderToJSONTyped,
 } from './ExternalLoginProvider';
+import type { ApiTokenScope } from './ApiTokenScope';
+import {
+    ApiTokenScopeFromJSON,
+    ApiTokenScopeFromJSONTyped,
+    ApiTokenScopeToJSON,
+    ApiTokenScopeToJSONTyped,
+} from './ApiTokenScope';
 
 /**
  * 
@@ -68,7 +75,13 @@ export interface AuthProfileDto {
      * 
      */
     linkedProviders?: Array<ExternalLoginProvider>;
+    /**
+     * 
+     */
+    tokenScope?: ApiTokenScope | null;
 }
+
+
 
 /**
  * Check if a given object implements the AuthProfileDto interface.
@@ -97,6 +110,7 @@ export function AuthProfileDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'hasPassword': json['hasPassword'] == null ? undefined : json['hasPassword'],
         'isEmailConfirmed': json['isEmailConfirmed'] == null ? undefined : json['isEmailConfirmed'],
         'linkedProviders': json['linkedProviders'] == null ? undefined : ((json['linkedProviders'] as Array<any>).map(ExternalLoginProviderFromJSON)),
+        'tokenScope': json['tokenScope'] === undefined ? undefined : json['tokenScope'] === null ? null : ApiTokenScopeFromJSON(json['tokenScope']),
     };
 }
 
@@ -121,6 +135,7 @@ export function AuthProfileDtoToJSONTyped(value?: AuthProfileDto | null, ignoreD
         'hasPassword': value['hasPassword'],
         'isEmailConfirmed': value['isEmailConfirmed'],
         'linkedProviders': value['linkedProviders'] == null ? undefined : ((value['linkedProviders'] as Array<any>).map(ExternalLoginProviderToJSON)),
+        'tokenScope': ApiTokenScopeToJSON(value['tokenScope']),
     };
 }
 

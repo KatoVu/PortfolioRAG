@@ -274,6 +274,38 @@ public sealed class TestHarness : IAsyncDisposable
             llmOptions,
             NullLogger<LlmCredentialService>.Instance);
 
+        // ------------------------------------------------------------------
+        // OAuth and upload links
+        // ------------------------------------------------------------------
+
+        OAuthOptions = new OAuthOptions
+        {
+            Issuer = "https://api.example.com",
+            ConsentUrl = "https://example.com/oauth/consent",
+            AllowedResources = ["https://mcp.example.com"]
+        };
+
+        var oauthOptions = Options.Create(OAuthOptions);
+
+        OAuthRepository = new OAuthRepository(Context);
+
+        OAuth = new OAuthService(
+            OAuthRepository,
+            ApiTokens,
+            CurrentUser,
+            TimeProvider,
+            oauthOptions,
+            NullLogger<OAuthService>.Instance);
+
+        UploadTickets = new UploadTicketService(
+            new UploadTicketRepository(Context),
+            Posts,
+            MediaService,
+            CurrentUser,
+            TimeProvider,
+            oauthOptions,
+            mediaOptions);
+
         JobFit = new JobFitService(
             Rag,
             Authors,
@@ -344,6 +376,14 @@ public sealed class TestHarness : IAsyncDisposable
     public ILlmCredentialService LlmCredentials { get; }
 
     public IJobFitService JobFit { get; }
+
+    public OAuthOptions OAuthOptions { get; }
+
+    public IOAuthRepository OAuthRepository { get; }
+
+    public IOAuthService OAuth { get; }
+
+    public IUploadTicketService UploadTickets { get; }
 
     /// <summary>Adds an author directly, bypassing registration.</summary>
     public async Task<Author> AddAuthorAsync(
@@ -461,7 +501,20 @@ public sealed class TestHarness : IAsyncDisposable
         CurrentUser.Email = email;
     }
 
-    public void SignOut() => CurrentUser.AuthorId = null;
+    /// <summary>Signs in as an API token of the given scope rather than a studio session.</summary>
+    public void SignInWithToken(Author author, ApiTokenScope scope)
+    {
+        SignIn(author);
+        CurrentUser.IsApiToken = true;
+        CurrentUser.ApiTokenScope = scope;
+    }
+
+    public void SignOut()
+    {
+        CurrentUser.AuthorId = null;
+        CurrentUser.IsApiToken = false;
+        CurrentUser.ApiTokenScope = null;
+    }
 
     public ValueTask DisposeAsync() => Context.DisposeAsync();
 }

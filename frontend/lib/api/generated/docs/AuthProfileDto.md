@@ -16,6 +16,7 @@ Name | Type
 `hasPassword` | boolean
 `isEmailConfirmed` | boolean
 `linkedProviders` | [Array&lt;ExternalLoginProvider&gt;](ExternalLoginProvider.md)
+`tokenScope` | [ApiTokenScope](ApiTokenScope.md)
 
 ## Example
 
@@ -34,6 +35,7 @@ const example = {
   "hasPassword": null,
   "isEmailConfirmed": null,
   "linkedProviders": null,
+  "tokenScope": null,
 } satisfies AuthProfileDto
 
 console.log(example)
