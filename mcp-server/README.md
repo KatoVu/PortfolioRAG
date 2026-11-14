@@ -94,7 +94,7 @@ both for `localhost:5009` and `localhost:3000`.
 
 | Variable | Meaning |
 | --- | --- |
-| `BLOGRAG_MCP_API_URL` | How this server reaches the API (`http://api:8080` in compose) |
+| `BLOGRAG_MCP_API_URL` | How this server reaches the API (`http://portfolio-api:8080` in compose) |
 | `BLOGRAG_MCP_PUBLIC_API_URL` | The API's public origin, which is the OAuth issuer. Must match `OAuth:Issuer` exactly |
 | `BLOGRAG_MCP_PUBLIC_URL` | This server's public URL including `/mcp`. Its origin must be in `OAuth:AllowedResources` |
 | `BLOGRAG_MCP_ALLOWED_HOSTS` | Host headers accepted (DNS-rebinding protection). Defaults to the host of `PUBLIC_URL` |

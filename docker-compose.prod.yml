@@ -86,7 +86,12 @@ services:
     image: ${IMAGE_PREFIX:?}/portfolio-api:${IMAGE_TAG:?}
     restart: unless-stopped
     environment: *api-environment
-    networks: [default, traefik]
+    networks:
+      default:
+        # A name no other site on the shared traefik network uses, so the MCP server's lookup
+        # cannot land on another stack's `api` and hand it an author's bearer token.
+        aliases: [portfolio-api]
+      traefik: {}
     labels:
       traefik.enable: "true"
       traefik.http.routers.portfolio-api.rule: Host(`api.${SITE_DOMAIN:?}`)
@@ -116,7 +121,8 @@ services:
     image: ${IMAGE_PREFIX:?}/portfolio-mcp:${IMAGE_TAG:?}
     restart: unless-stopped
     environment:
-      BLOGRAG_MCP_API_URL: http://api:8080
+      # Plain HTTP on purpose: this hop never leaves the host's private compose network.
+      BLOGRAG_MCP_API_URL: http://portfolio-api:8080
       # Must match the API's OAuth__Issuer to the character.
       BLOGRAG_MCP_PUBLIC_API_URL: https://api.${SITE_DOMAIN:?}
       BLOGRAG_MCP_PUBLIC_URL: https://mcp.${SITE_DOMAIN:?}/mcp
