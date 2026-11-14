@@ -29,6 +29,7 @@ export * from './ExperienceDto';
 export * from './ExperienceInputDto';
 export * from './ExternalLoginProvider';
 export * from './GoogleSignInDto';
+export * from './GrantModeDto';
 export * from './JobFitAvailabilityDto';
 export * from './JobFitReportDto';
 export * from './JobFitRequestDto';

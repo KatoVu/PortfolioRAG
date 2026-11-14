@@ -48,6 +48,7 @@ docs/ExperienceInputDto.md
 docs/ExperiencesApi.md
 docs/ExternalLoginProvider.md
 docs/GoogleSignInDto.md
+docs/GrantModeDto.md
 docs/JobFitApi.md
 docs/JobFitAvailabilityDto.md
 docs/JobFitReportDto.md
@@ -128,6 +129,7 @@ models/ExperienceDto.ts
 models/ExperienceInputDto.ts
 models/ExternalLoginProvider.ts
 models/GoogleSignInDto.ts
+models/GrantModeDto.ts
 models/JobFitAvailabilityDto.ts
 models/JobFitReportDto.ts
 models/JobFitRequestDto.ts

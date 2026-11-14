@@ -14,6 +14,7 @@ Name | Type
 `resource` | string
 `allows` | Array&lt;string&gt;
 `neverAllows` | Array&lt;string&gt;
+`fullEditingAllows` | Array&lt;string&gt;
 
 ## Example
 
@@ -30,6 +31,7 @@ const example = {
   "resource": null,
   "allows": null,
   "neverAllows": null,
+  "fullEditingAllows": null,
 } satisfies ConsentDescriptionDto
 
 console.log(example)

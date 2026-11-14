@@ -52,6 +52,10 @@ export interface ConsentDescriptionDto {
      * 
      */
     neverAllows?: Array<string>;
+    /**
+     * 
+     */
+    fullEditingAllows?: Array<string>;
 }
 
 /**
@@ -79,6 +83,7 @@ export function ConsentDescriptionDtoFromJSONTyped(json: any, ignoreDiscriminato
         'resource': json['resource'] === undefined ? undefined : json['resource'] === null ? null : json['resource'],
         'allows': json['allows'] == null ? undefined : json['allows'],
         'neverAllows': json['neverAllows'] == null ? undefined : json['neverAllows'],
+        'fullEditingAllows': json['fullEditingAllows'] == null ? undefined : json['fullEditingAllows'],
     };
 }
 
@@ -101,6 +106,7 @@ export function ConsentDescriptionDtoToJSONTyped(value?: ConsentDescriptionDto |
         'resource': value['resource'],
         'allows': value['allows'],
         'neverAllows': value['neverAllows'],
+        'fullEditingAllows': value['fullEditingAllows'],
     };
 }
 

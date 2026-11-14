@@ -9,6 +9,7 @@ Name | Type
 `id` | number
 `clientName` | string
 `scope` | string
+`fullEditing` | boolean
 `createdAt` | Date
 `lastUsedAt` | Date
 `revokedAt` | Date
@@ -24,6 +25,7 @@ const example = {
   "id": null,
   "clientName": null,
   "scope": null,
+  "fullEditing": null,
   "createdAt": null,
   "lastUsedAt": null,
   "revokedAt": null,

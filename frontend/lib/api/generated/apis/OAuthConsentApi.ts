@@ -35,6 +35,11 @@ import {
     ConsentResultDtoToJSON,
 } from '../models/ConsentResultDto';
 import {
+    type GrantModeDto,
+    GrantModeDtoFromJSON,
+    GrantModeDtoToJSON,
+} from '../models/GrantModeDto';
+import {
     type OAuthGrantDto,
     OAuthGrantDtoFromJSON,
     OAuthGrantDtoToJSON,
@@ -64,6 +69,17 @@ export interface OAuthConsentRevokeGrantRequest {
      * 
      */
     id: number;
+}
+
+export interface OAuthConsentSetGrantModeRequest {
+    /**
+     * 
+     */
+    id: number;
+    /**
+     * 
+     */
+    grantModeDto: GrantModeDto;
 }
 
 /**
@@ -276,6 +292,69 @@ export class OAuthConsentApi extends runtime.BaseAPI {
      */
     async oAuthConsentRevokeGrant(requestParameters: OAuthConsentRevokeGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<OAuthGrantDto> {
         const response = await this.oAuthConsentRevokeGrantRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for oAuthConsentSetGrantMode without sending the request
+     */
+    async oAuthConsentSetGrantModeRequestOpts(requestParameters: OAuthConsentSetGrantModeRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling oAuthConsentSetGrantMode().'
+            );
+        }
+
+        if (requestParameters['grantModeDto'] == null) {
+            throw new runtime.RequiredError(
+                'grantModeDto',
+                'Required parameter "grantModeDto" was null or undefined when calling oAuthConsentSetGrantMode().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("Bearer", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/api/oauth/grants/{id}/mode`;
+        urlPath = urlPath.replace('{id}', encodeURIComponent(String(requestParameters['id'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: GrantModeDtoToJSON(requestParameters['grantModeDto']),
+        };
+    }
+
+    /**
+     * Requires a signed-in session: an API token is refused here.
+     */
+    async oAuthConsentSetGrantModeRaw(requestParameters: OAuthConsentSetGrantModeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<OAuthGrantDto>> {
+        const requestOptions = await this.oAuthConsentSetGrantModeRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => OAuthGrantDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Requires a signed-in session: an API token is refused here.
+     */
+    async oAuthConsentSetGrantMode(requestParameters: OAuthConsentSetGrantModeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<OAuthGrantDto> {
+        const response = await this.oAuthConsentSetGrantModeRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

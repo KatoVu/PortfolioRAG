@@ -8,6 +8,7 @@ All URIs are relative to *http://localhost:5019*
 | [**oAuthConsentDescribe**](OAuthConsentApi.md#oauthconsentdescribe) | **POST** /api/oauth/consent/describe |  |
 | [**oAuthConsentListGrants**](OAuthConsentApi.md#oauthconsentlistgrants) | **GET** /api/oauth/grants |  |
 | [**oAuthConsentRevokeGrant**](OAuthConsentApi.md#oauthconsentrevokegrant) | **POST** /api/oauth/grants/{id}/revoke |  |
+| [**oAuthConsentSetGrantMode**](OAuthConsentApi.md#oauthconsentsetgrantmode) | **PUT** /api/oauth/grants/{id}/mode |  |
 
 
 
@@ -292,6 +293,83 @@ example().catch(console.error);
 | **200** |  |  -  |
 | **401** |  |  -  |
 | **404** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## oAuthConsentSetGrantMode
+
+> OAuthGrantDto oAuthConsentSetGrantMode(id, grantModeDto)
+
+
+
+Requires a signed-in session: an API token is refused here.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  OAuthConsentApi,
+} from '';
+import type { OAuthConsentSetGrantModeRequest } from '';
+
+async function example() {
+  console.log("🚀 Testing  SDK...");
+  const config = new Configuration({ 
+    // Configure HTTP bearer authorization: Bearer
+    accessToken: "YOUR BEARER TOKEN",
+  });
+  const api = new OAuthConsentApi(config);
+
+  const body = {
+    // number
+    id: 56,
+    // GrantModeDto
+    grantModeDto: ...,
+  } satisfies OAuthConsentSetGrantModeRequest;
+
+  try {
+    const data = await api.oAuthConsentSetGrantMode(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `number` |  | [Defaults to `undefined`] |
+| **grantModeDto** | [GrantModeDto](GrantModeDto.md) |  | |
+
+### Return type
+
+[**OAuthGrantDto**](OAuthGrantDto.md)
+
+### Authorization
+
+[Bearer](../README.md#Bearer)
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+| **401** |  |  -  |
+| **404** |  |  -  |
+| **409** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

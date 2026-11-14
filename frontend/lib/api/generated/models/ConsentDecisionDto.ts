@@ -56,6 +56,10 @@ export interface ConsentDecisionDto {
      * 
      */
     approve?: boolean;
+    /**
+     * 
+     */
+    fullEditing?: boolean;
 }
 
 /**
@@ -84,6 +88,7 @@ export function ConsentDecisionDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'scope': json['scope'] === undefined ? undefined : json['scope'] === null ? null : json['scope'],
         'resource': json['resource'] === undefined ? undefined : json['resource'] === null ? null : json['resource'],
         'approve': json['approve'] == null ? undefined : json['approve'],
+        'fullEditing': json['fullEditing'] == null ? undefined : json['fullEditing'],
     };
 }
 
@@ -107,6 +112,7 @@ export function ConsentDecisionDtoToJSONTyped(value?: ConsentDecisionDto | null,
         'scope': value['scope'],
         'resource': value['resource'],
         'approve': value['approve'],
+        'fullEditing': value['fullEditing'],
     };
 }
 

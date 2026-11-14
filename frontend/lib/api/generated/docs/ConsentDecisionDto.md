@@ -15,6 +15,7 @@ Name | Type
 `scope` | string
 `resource` | string
 `approve` | boolean
+`fullEditing` | boolean
 
 ## Example
 
@@ -32,6 +33,7 @@ const example = {
   "scope": null,
   "resource": null,
   "approve": null,
+  "fullEditing": null,
 } satisfies ConsentDecisionDto
 
 console.log(example)

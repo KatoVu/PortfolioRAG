@@ -35,6 +35,10 @@ export interface OAuthGrantDto {
     /**
      * 
      */
+    fullEditing?: boolean;
+    /**
+     * 
+     */
     createdAt?: Date;
     /**
      * 
@@ -70,6 +74,7 @@ export function OAuthGrantDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'id': json['id'] == null ? undefined : json['id'],
         'clientName': json['clientName'] == null ? undefined : json['clientName'],
         'scope': json['scope'] == null ? undefined : json['scope'],
+        'fullEditing': json['fullEditing'] == null ? undefined : json['fullEditing'],
         'createdAt': json['createdAt'] == null ? undefined : (parseDateTime(json['createdAt'])),
         'lastUsedAt': json['lastUsedAt'] === undefined ? undefined : json['lastUsedAt'] === null ? null : (parseDateTime(json['lastUsedAt'])),
         'revokedAt': json['revokedAt'] === undefined ? undefined : json['revokedAt'] === null ? null : (parseDateTime(json['revokedAt'])),
@@ -91,6 +96,7 @@ export function OAuthGrantDtoToJSONTyped(value?: OAuthGrantDto | null, ignoreDis
         'id': value['id'],
         'clientName': value['clientName'],
         'scope': value['scope'],
+        'fullEditing': value['fullEditing'],
         'createdAt': value['createdAt'] == null ? value['createdAt'] : serializeDateTime(value['createdAt']),
         'lastUsedAt': value['lastUsedAt'] == null ? value['lastUsedAt'] : serializeDateTime(value['lastUsedAt']),
         'revokedAt': value['revokedAt'] == null ? value['revokedAt'] : serializeDateTime(value['revokedAt']),
