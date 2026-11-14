@@ -16,10 +16,10 @@ import { Toggle } from "../ui/Toggle";
  * them, widen or narrow what each may do, and cut any of them off.
  */
 export function ConnectedApps() {
-  const { apps, state, busy, disconnect, setMode } = useConnectedApps();
+  const { apps, state, busy, disconnect, setMode, reload } = useConnectedApps();
 
   // Nothing worth a panel on a deployment that has OAuth switched off.
-  if (state === "error") return null;
+  if (state === "unavailable") return null;
 
   return (
     <Panel className="flex flex-col gap-4 p-5 sm:p-6">
@@ -36,6 +36,13 @@ export function ConnectedApps() {
 
       {state === "loading" ? (
         <div aria-hidden className="h-16 rounded bg-warm-sunken" />
+      ) : state === "error" ? (
+        <EmptyState
+          icon="error"
+          title="Could not load your connected apps"
+          description="The API did not answer. No app has been changed."
+          action={<Button onClick={() => void reload()}>Try again</Button>}
+        />
       ) : apps.length > 0 ? (
         <ul className="divide-y divide-warm-border/60 overflow-hidden rounded border border-warm-border bg-warm-surface">
           {apps.map((app) => (

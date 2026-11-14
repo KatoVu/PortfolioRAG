@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { OAuthGrantDto } from "@/lib/api/generated";
+import { ResponseError, type OAuthGrantDto } from "@/lib/api/generated";
 import { describeError, oauthConsentApi } from "./client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./useToast";
@@ -18,7 +18,7 @@ export function useConnectedApps() {
   const authorId = session?.authorId ?? null;
 
   const [apps, setApps] = useState<OAuthGrantDto[]>([]);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [busy, setBusy] = useState(false);
 
   // Drops the answer to a load that a later one has already overtaken.
@@ -35,12 +35,13 @@ export function useConnectedApps() {
 
       setApps(loaded);
       setState("ready");
-    } catch {
+    } catch (error) {
       if (marker !== requestToken.current) return;
 
-      // NOTE: quiet on purpose. A deployment without OAuth configured answers 503 here,
-      // and the tokens above are still worth showing; the section just stays empty.
-      setState("error");
+      // NOTE: a deployment without OAuth configured answers 503, and the panel hides. Any
+      // other failure keeps it on screen with a retry, so a real outage is not mistaken for
+      // "OAuth is off" and the author can still reach a connected app to disconnect it.
+      setState(error instanceof ResponseError && error.response.status === 503 ? "unavailable" : "error");
     }
   }, [authorId]);
 
@@ -90,5 +91,10 @@ export function useConnectedApps() {
     [showToast],
   );
 
-  return { apps: apps.filter((app) => app.isActive), state, busy, disconnect, setMode };
+  const reload = useCallback(async () => {
+    setState("loading");
+    await load();
+  }, [load]);
+
+  return { apps: apps.filter((app) => app.isActive), state, busy, disconnect, setMode, reload };
 }
